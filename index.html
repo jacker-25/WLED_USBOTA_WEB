@@ -1,0 +1,908 @@
+<!DOCTYPE html><html lang="zh-CN"><head><script type="importmap">{"imports":{"2Gji0":"./esp32s2.0e60f0ba.js","39GCu":"./stub_flasher_32c61.0b41a6f3.js","6OMsr":"./esp32c3.b8fd8bbd.js","72Vwv":"./esp32c6.3505298b.js","7DfFI":"./esp32c5.1333799c.js","7QM8Q":"./stub_flasher_32c3.cfdc756d.js","7V5FC":"./stub_flasher_32p4.b8752280.js","9V59r":"./esp32c2.40c800ed.js","9Xfzj":"./stub_flasher_32p4rc1.7c71cf93.js","birqg":"./stub_flasher_8266.cd29f63c.js","bvw22":"./stub_flasher_32s2.ddadc23b.js","dkZmZ":"./stub_flasher_32h2.2bfdd977.js","doHHk":"./stub_flasher_32.9e215b91.js","dsL7K":"./stub_flasher_32c2.c4d906d8.js","eEuAm":"./esp32s3.43f79625.js","eeu4M":"./stub_flasher_32c6.16cce656.js","fA7wz":"./esp32c61.ca849f22.js","fLjo9":"./stub_flasher_32s3.90128e90.js","irlzF":"./esp32h2.9cf87b4e.js","jZRQP":"./stub_flasher_32c5.8545ecc6.js","kLYuc":"./esp32p4.618ad7f8.js","lAyUi":"./esp32.68303c1c.js"}}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WLED Web Flash</title>
+<link rel="icon" href="favicon.ee2246ac.ico">
+
+<!-- ========= Bootstrap 5.3 CSS + Bootstrap Icons ========= -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+<!-- CryptoJS（用于 esptool-js 烧录时 MD5 校验） -->
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
+<!-- JSZip（用于日志打包下载） -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<style>:root {
+  --bs-primary: #2fb8a8;
+  --bs-primary-rgb: 47, 184, 168;
+  --bs-primary-dark: #1d8e84;
+  --brand-soft: #d6f1ec;
+  --brand-mid: #7dd3c8;
+  --grey: #efefef;
+  --grey-icon: #bfbfbf;
+  --text: #333;
+  --sub: #8a8a8a;
+}
+
+.btn-primary {
+  background-color: var(--bs-primary) !important;
+  border-color: var(--bs-primary) !important;
+  color: #fff !important;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--bs-primary-dark) !important;
+  border-color: var(--bs-primary-dark) !important;
+  color: #fff !important;
+}
+
+.btn-primary:disabled {
+  color: #adb5bd !important;
+  background-color: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+.btn-outline-primary {
+  color: var(--bs-primary) !important;
+  border-color: var(--bs-primary) !important;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  background-color: var(--bs-primary) !important;
+  border-color: var(--bs-primary) !important;
+}
+
+.btn-outline-primary:disabled {
+  color: #ccc !important;
+  background: #fff !important;
+  border-color: #ddd !important;
+}
+
+.header-right {
+  white-space: nowrap !important;
+  flex-flow: row !important;
+  align-items: center !important;
+  display: flex !important;
+}
+
+#mainModal .modal-dialog-centered {
+  min-height: 55vh !important;
+}
+
+#mainModal .modal-dialog.modal-confirm {
+  max-width: 460px !important;
+}
+
+#mainModal .modal-dialog.modal-picker {
+  max-width: 520px !important;
+}
+
+.pick-item .pi-name, .pick-item .pi-sub {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.btn-link {
+  color: var(--bs-primary) !important;
+  text-decoration: none !important;
+}
+
+.btn-link:hover {
+  color: var(--bs-primary-dark) !important;
+  text-decoration: underline !important;
+}
+
+.text-brand {
+  color: var(--bs-primary);
+}
+
+.bg-brand, .progress-bar.bg-brand {
+  background-color: var(--bs-primary) !important;
+}
+
+body {
+  color: var(--text);
+  background: #eef1f6;
+  margin: 0;
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei, sans-serif;
+}
+
+.page-card {
+  background: #fff;
+  border-radius: 22px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 34px 40px 40px;
+  position: relative;
+  box-shadow: 0 8px 30px #0000000f;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.wiz-status {
+  text-align: center;
+  margin: 6px 0 16px;
+}
+
+#wiz-text {
+  color: var(--bs-primary);
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+#wiz-text b {
+  font-weight: 700;
+}
+
+.wiz {
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0;
+  display: flex;
+}
+
+.step {
+  text-align: center;
+  flex-direction: column;
+  flex: 0 0 190px;
+  align-items: center;
+  display: flex;
+}
+
+.circle {
+  background: var(--grey);
+  width: 96px;
+  height: 96px;
+  color: var(--grey-icon);
+  border-radius: 22px;
+  justify-content: center;
+  align-items: center;
+  transition: all .3s;
+  display: flex;
+}
+
+.step.done .circle {
+  background: var(--brand-soft);
+  color: var(--bs-primary);
+}
+
+.step.current .circle {
+  border: 2px solid var(--bs-primary);
+  color: var(--bs-primary);
+  background: #fff;
+}
+
+.step.done.current .circle {
+  background: var(--brand-soft);
+  border: 2px solid var(--brand-mid);
+}
+
+.line {
+  background-image: linear-gradient(to right,var(--grey-icon) 45%,transparent 45%);
+  background-repeat: repeat-x;
+  background-size: 9px 2px;
+  flex: auto;
+  height: 2px;
+  margin: 47px 6px 0;
+  transition: all .3s;
+}
+
+.line.done {
+  background-image: linear-gradient(to right,var(--bs-primary) 45%,transparent 45%);
+}
+
+.label {
+  color: var(--sub);
+  width: 100%;
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.label b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.label .link {
+  color: var(--bs-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.label .link:hover {
+  text-decoration: underline;
+}
+
+.done-box {
+  text-align: center;
+  max-width: 300px;
+  margin: 0 auto 10px;
+  position: relative;
+}
+
+.done-circle {
+  background: var(--bs-primary);
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  animation: .5s cubic-bezier(.34, 1.56, .64, 1) both donePop;
+  display: flex;
+  box-shadow: 0 4px 14px #2fb8a873;
+}
+
+.done-circle svg {
+  color: #fff;
+  width: 26px;
+  height: 26px;
+}
+
+@keyframes donePop {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.foot {
+  text-align: center;
+  color: #aaa;
+  min-height: 16px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.radio-row {
+  cursor: pointer;
+  border: 1px solid #0000;
+  border-radius: 6px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  display: flex;
+}
+
+.radio-row:hover {
+  background: #fafafa;
+}
+
+.radio-row.on {
+  background: var(--brand-soft);
+  border-color: var(--brand-mid);
+}
+
+.radio-row input {
+  accent-color: var(--bs-primary);
+  flex: none;
+  margin-top: 3px;
+}
+
+.radio-row .t {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.radio-row .s {
+  color: var(--sub);
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.radio-row .r {
+  color: var(--bs-primary);
+  background: #fff5ea;
+  border-radius: 3px;
+  align-self: center;
+  margin-left: auto;
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.picker {
+  border: 1px solid #eee;
+  border-radius: 6px;
+  height: 280px;
+  display: flex;
+  overflow: hidden;
+}
+
+.picker .col {
+  overflow: auto;
+}
+
+.picker .col.left {
+  background: #fafafa;
+  border-right: 1px solid #eee;
+  flex: 0 0 46%;
+}
+
+.picker .col.right {
+  flex: 1;
+}
+
+.picker .hd {
+  letter-spacing: 1px;
+  color: #aaa;
+  text-align: center;
+  background: #fcfcfc;
+  border-bottom: 1px solid #eee;
+  padding: 9px 0;
+  font-size: 11px;
+  position: sticky;
+  top: 0;
+}
+
+.picker .it {
+  cursor: pointer;
+  border-bottom: 1px solid #f4f4f4;
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+.picker .left .it.on {
+  color: var(--bs-primary);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+
+.picker .left .it:hover {
+  background: #f3f3f3;
+}
+
+.picker .right .it {
+  align-items: center;
+  gap: 8px;
+  display: flex;
+}
+
+.picker .right .it.on {
+  background: var(--brand-soft);
+}
+
+.picker .right .it:hover {
+  background: #fdf3e7;
+}
+
+.picker .right .it .v {
+  font-weight: 600;
+}
+
+.picker .right .it .d {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.picker .right .it .tag {
+  color: #fff;
+  background: var(--bs-primary);
+  border-radius: 3px;
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+.picker .empty {
+  text-align: center;
+  color: #bbb;
+  padding: 30px 14px;
+  font-size: 13px;
+}
+
+.pick-item {
+  cursor: pointer;
+  background: #fff;
+  border-bottom: 1px solid #f4f4f4;
+  padding: 11px 14px;
+  font-size: 13px;
+  transition: all .12s;
+}
+
+.pick-item:hover {
+  background: #fafafa;
+}
+
+.pick-item.on {
+  background: var(--brand-soft);
+  color: var(--bs-primary);
+}
+
+.pick-item.on .pi-name {
+  color: var(--bs-primary);
+}
+
+.pick-item.on .pi-sub {
+  color: var(--brand-mid);
+}
+
+.pi-name {
+  color: #333;
+  font-weight: 600;
+}
+
+.pi-sub {
+  color: #888;
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.log-box {
+  max-width: 760px;
+  margin: 20px auto 0;
+  display: none;
+}
+
+.log-box.show {
+  display: block;
+}
+
+.log-bd {
+  color: #e9ecef;
+  background: #212529;
+  border-radius: 0 0 8px 8px;
+  height: 180px;
+  padding: 10px;
+  font: 12px / 1.5 Consolas, Monaco, monospace;
+  overflow-y: auto;
+}
+
+.log-bd .ll {
+  white-space: pre-wrap;
+  margin: 1px 0;
+}
+
+.log-bd .ti {
+  color: #17a2b8;
+}
+
+.log-bd .ts {
+  color: #28a745;
+}
+
+.log-bd .te {
+  color: #dc3545;
+}
+
+.log-bd .tw {
+  color: #ffc107;
+}
+
+.ci-card {
+  color: #06c;
+  background: #e7f1ff;
+  border: 1px solid #b3d7ff;
+  border-radius: 8px;
+  max-width: 400px;
+  margin-top: 14px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.ci-card .row2 {
+  gap: 16px;
+  margin-bottom: 4px;
+  display: flex;
+}
+
+.ci-card .row2:last-child {
+  margin-bottom: 0;
+}
+
+.ci-card .lbl {
+  min-width: 60px;
+  font-weight: 600;
+}
+
+.top-actions {
+  z-index: 5;
+  gap: 14px;
+  display: flex;
+  position: absolute;
+  top: 14px;
+  right: 22px;
+}
+
+.ta-btn {
+  width: auto;
+  height: auto;
+  color: var(--bs-primary);
+  cursor: pointer;
+  box-shadow: none;
+  background: none;
+  border: none;
+  border-radius: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  transition: all .2s;
+  display: flex;
+  position: relative;
+}
+
+.ta-btn .icon-wrap {
+  border: 1px solid var(--brand-mid);
+  background: #fff;
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+  width: 38px;
+  height: 38px;
+  transition: all .2s;
+  display: flex;
+  position: relative;
+  box-shadow: 0 2px 6px #0000000a;
+}
+
+.ta-btn:hover .icon-wrap {
+  color: var(--bs-primary-dark);
+  border-color: var(--bs-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px #0000001a;
+}
+
+.ta-btn:hover .lbl {
+  color: var(--bs-primary-dark);
+}
+
+.ta-btn .lbl {
+  color: var(--bs-primary);
+  white-space: nowrap;
+  font-size: 11px;
+  transition: all .2s;
+}
+
+@media (width <= 900px) {
+  .ta-btn .lbl {
+    display: none;
+  }
+
+  .ta-btn .icon-wrap {
+    width: 32px;
+    height: 32px;
+  }
+
+  .top-actions {
+    gap: 8px;
+    top: 10px;
+    right: 14px;
+  }
+
+  .ta-btn {
+    gap: 0;
+    padding: 2px 4px;
+  }
+
+  .page-card {
+    padding: 40px 24px 32px;
+  }
+
+  .wiz-status {
+    margin-top: 52px;
+  }
+}
+
+@media (width <= 560px) {
+  .top-actions {
+    justify-content: center;
+    margin-bottom: 12px;
+    position: static;
+  }
+
+  .page-card {
+    padding: 24px 16px;
+  }
+
+  .wiz-status {
+    margin-top: 12px;
+  }
+}
+
+.picker3 {
+  border: 1px solid #eee;
+  border-radius: 6px;
+  height: 320px;
+  display: flex;
+  overflow: hidden;
+}
+
+.picker3 .col {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+
+.picker3 .col.c1, .picker3 .col.c2 {
+  background: #fafafa;
+  border-right: 1px solid #eee;
+}
+
+.picker3 .hd {
+  letter-spacing: 1px;
+  color: #aaa;
+  text-align: center;
+  background: #fcfcfc;
+  border-bottom: 1px solid #eee;
+  padding: 9px 0;
+  font-size: 11px;
+  position: sticky;
+  top: 0;
+}
+
+.picker3 .it {
+  cursor: pointer;
+  border-bottom: 1px solid #f4f4f4;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  font-size: 13px;
+  display: flex;
+}
+
+.picker3 .it .arr {
+  color: #ccc;
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.picker3 .c1 .it.on, .picker3 .c2 .it.on {
+  color: var(--bs-primary);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+
+.picker3 .c1 .it:hover, .picker3 .c2 .it:hover {
+  background: #f3f3f3;
+}
+
+.picker3 .c3 .it {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  display: flex;
+}
+
+.picker3 .c3 .it .rowv {
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  display: flex;
+}
+
+.picker3 .c3 .it .v {
+  font-weight: 600;
+}
+
+.picker3 .c3 .it .d {
+  color: var(--sub);
+  font-size: 11px;
+}
+
+.picker3 .c3 .it .tag {
+  color: #fff;
+  background: var(--bs-primary);
+  border-radius: 3px;
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+.picker3 .c3 .it.on {
+  background: var(--brand-soft);
+}
+
+.picker3 .c3 .it:hover {
+  background: #fdf3e7;
+}
+
+.picker3 .empty {
+  text-align: center;
+  color: #bbb;
+  padding: 30px 14px;
+  font-size: 13px;
+}
+
+.fw-bar {
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  display: flex;
+}
+
+.progress-bar.bg-brand {
+  transition: width .3s cubic-bezier(.4, 0, .2, 1);
+  background: linear-gradient(90deg,var(--bs-primary),var(--bs-primary-dark)) !important;
+}
+
+@media (width <= 900px) {
+  .wiz {
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .step {
+    flex: none;
+  }
+
+  .line {
+    display: none;
+  }
+
+  .label {
+    min-height: 0;
+    margin-bottom: 6px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="page-card">
+  <!-- ============ 右上角图标按钮 ============ -->
+  <div class="top-actions">
+    <button class="ta-btn" id="btn-fw">
+      <div class="icon-wrap">
+        <i class="bi bi-memory fs-5"></i>
+      </div>
+      <span class="lbl">固件库</span>
+    </button>
+    <button class="ta-btn" id="btn-log">
+      <div class="icon-wrap">
+        <i class="bi bi-journal-text fs-5"></i>
+      </div>
+      <span class="lbl">日志</span>
+    </button>
+    <button class="ta-btn" id="btn-forum">
+      <div class="icon-wrap">
+        <i class="bi bi-chat-dots fs-5"></i>
+      </div>
+      <span class="lbl">论坛</span>
+    </button>
+  </div>
+
+  <!-- ============ 全局状态区 ============ -->
+  <div class="wiz-status" id="wiz-status">
+    <!-- ① 静态状态文字 -->
+    <div id="wiz-text">请将你的<b>设备</b>插入 USB 接口，<br>然后点击<b>连接</b>按钮继续。</div>
+
+    <!-- ② 烧录进度条（Bootstrap progress） -->
+    <div class="progress-box hidden" id="progress-box">
+      <div class="text-brand fw-semibold mb-2" id="p-title" style="font-size: 17px">烧录中，请勿拔出设备或关闭浏览器</div>
+      <div class="progress" style="max-width: 560px; height: 10px; margin: 0 auto">
+        <div class="progress-bar bg-brand" id="p-fill" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <div id="p-tip" class="text-muted mt-2" style="font-size: 13px">准备中…</div>
+    </div>
+
+    <!-- ③ 烧录完成小勾圈 -->
+    <div class="done-box hidden" id="done-box">
+      <div class="text-brand fw-semibold mb-2" id="done-msg" style="font-size: 14px">烧录完成</div>
+      <div class="done-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 三步向导 ============ -->
+  <div class="wiz">
+    <div class="step current" id="step-1">
+      <div class="circle" id="icon-1">
+        <!-- USB Flash Drive 风格 -->
+        <svg viewBox="0 0 48 48" width="44" height="44" fill="currentColor">
+          <rect x="18" y="4" width="12" height="8" rx="1"></rect>
+          <rect x="20" y="6" width="2" height="4"></rect>
+          <rect x="26" y="6" width="2" height="4"></rect>
+          <rect x="12" y="12" width="24" height="28" rx="4"></rect>
+          <circle cx="19" cy="26" r="2" fill="#fff"></circle>
+          <circle cx="29" cy="26" r="2" fill="#fff"></circle>
+          <rect x="18" y="32" width="12" height="2.5" rx="1" fill="#fff"></rect>
+        </svg>
+      </div>
+      <div class="label" id="label-1"></div>
+      <button class="btn btn-primary" id="btn-1">连接</button>
+    </div>
+
+    <div class="line" id="line-1"></div>
+
+    <div class="step" id="step-2">
+      <div class="circle" id="icon-2">
+        <!-- 固件文档 + 勾选 风格 -->
+        <svg viewBox="0 0 48 48" width="44" height="44" fill="currentColor">
+          <path d="M14 6 L30 6 L38 14 L38 42 L14 42 Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"></path>
+          <path d="M30 6 L30 14 L38 14" fill="none" stroke="currentColor" stroke-width="2.5"></path>
+          <rect x="17" y="28" width="8" height="8" rx="1.5" fill="currentColor"></rect>
+          <path d="M19 32.5 L21 34.5 L24.5 31" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          <rect x="27" y="20" width="8" height="1.6" rx="0.8"></rect>
+          <rect x="27" y="24" width="6" height="1.6" rx="0.8"></rect>
+        </svg>
+      </div>
+      <div class="label" id="label-2"></div>
+      <button class="btn btn-primary" id="btn-2" style="display: none">选择</button>
+    </div>
+
+    <div class="line" id="line-2"></div>
+
+    <div class="step" id="step-3">
+      <div class="circle" id="icon-3">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+          <path d="M12 2 4 10h5v10h6V10h5L12 2zM4 22h16v-2H4v2z"></path>
+        </svg>
+      </div>
+      <div class="label" id="label-3"></div>
+      <button class="btn btn-primary" id="btn-3" style="display: none">烧录</button>
+    </div>
+  </div>
+
+  <!-- 芯片信息 -->
+  <div class="ci-card" id="ci-card" style="display: none"></div>
+
+  <!-- ============ 日志区（Bootstrap dark + monospace） ============ -->
+  <div class="log-box" id="log-box">
+    <div class="d-flex justify-content-between align-items-center bg-dark text-light rounded-top px-3 py-2" style="font-size: 12px">
+      <span><i class="bi bi-terminal me-1"></i>Flasher Log</span>
+      <button class="btn btn-outline-primary btn-sm" id="btnClr">清屏</button>
+    </div>
+    <div class="log-bd" id="logBd"></div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<!-- ============ Bootstrap Modal（通用弹窗容器，JS 动态填充内容） ============ -->
+<div class="modal fade" id="mainModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" id="modal-dialog">
+    <div class="modal-content">
+      <!-- header 由 JS 动态填充 -->
+      <div class="modal-header" id="modal-header">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <!-- body 由 JS 动态填充 -->
+      <div class="modal-body" id="modal-body"></div>
+      <!-- footer 由 JS 动态填充（可选） -->
+      <div class="modal-footer justify-content-center" id="modal-footer"></div>
+    </div>
+  </div>
+</div>
+
+<script>// Safari 浏览器不支持 Web Serial，提前拦截
+(function() {
+    var isSafari = /constructor/i.test(window.HTMLElement) || function(p) {
+        return "[object SafariRemoteNotification]" === p.toString();
+    }(!window.safari || "u" === typeof safari && window.safari.pushNotification);
+    if (isSafari) document.querySelector('.page-card').innerHTML = '<h3 class="text-center text-danger">\u274C Safari \u6D4F\u89C8\u5668\u4E0D\u652F\u6301 Web Serial</h3><p class="text-center text-muted">\u8BF7\u4F7F\u7528\u684C\u9762\u7248 Chrome \u6216 Edge \u6D4F\u89C8\u5668\u6253\u5F00\u672C\u9875\u3002</p>';
+})();
+
+</script>
+
+<!-- Bootstrap 5.3 JS Bundle（含 Modal、Progress 等组件逻辑） -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="typescript.ede591c7.js" type="module"></script>
+
+
+</body></html>
