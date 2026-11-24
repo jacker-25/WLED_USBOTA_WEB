@@ -41,7 +41,8 @@ const serialLib: any = !(globalThis as any).navigator.serial && (globalThis as a
   : (globalThis as any).navigator.serial;
 declare let CryptoJS: any;
 declare const Terminal: any;
-declare const JSZip: any;  // 来自 CDN
+declare const JSZip: any;       // 来自 CDN
+declare const bootstrap: any;  // Bootstrap 5.3 JS Bundle（来自 CDN）
 
 // ---------------------------------------------------------------------------
 // 日志缓存（用于 zip 打包下载）
@@ -169,22 +170,69 @@ function setLabel(i: number, html: string) {
 function setFoot(html: string) { $("foot").textContent = html; }
 
 // ---------------------------------------------------------------------------
-// 弹窗
+// 弹窗（Bootstrap Modal API）
 // ---------------------------------------------------------------------------
-function openModal(html: string) {
-  $("dlg").innerHTML = html;
-  $("mask").classList.remove("hidden");
-  document.body.classList.add("no-scroll");   // ← 锁滚动
-  const x = $("dlg").querySelector(".x") as HTMLElement | null;
-  if (x) x.onclick = closeModal;
+let _modal: any = null;   // bootstrap.Modal 实例
+
+function getModal() {
+  if (!_modal) _modal = new bootstrap.Modal(document.getElementById("mainModal"));
+  return _modal;
 }
+
+/**
+ * 通用弹窗：把 bodyHTML 放进 Bootstrap Modal 的 modal-body
+ * @param bodyHTML    要放进 modal-body 的 HTML
+ * @param title       顶部标题（可选）
+ * @param headerRight 标题右侧、× 左边的自定义 HTML（可选，比如下载按钮）
+ * @param size        弹窗尺寸：'sm' | '' (默认 md) | 'lg' | 'xl' | 'picker' (自定义 680px)
+ */
+function openModal(bodyHTML: string, title = "", headerRight = "", size: "sm" | "" | "lg" | "xl" | "picker" = "lg") {
+  // 清理 footer + header 右侧残留
+  $("modal-footer").innerHTML = "";
+  const dialog = document.getElementById("modal-dialog")!;
+  const header = document.getElementById("modal-header")!;
+  const oldRight = header.querySelector(".header-right");
+  if (oldRight) oldRight.remove();
+
+  // 动态切换尺寸 class
+  dialog.classList.remove("modal-sm", "modal-lg", "modal-xl", "modal-dialog-scrollable", "modal-confirm", "modal-picker");
+  if (size === "picker") {
+    dialog.classList.add("modal-lg", "modal-picker");   // 用 lg 作为基础，CSS 覆盖 max-width
+  } else if (size) {
+    dialog.classList.add("modal-" + size);
+  }
+
+  // 填充 header title
+  const btnClose = header.querySelector(".btn-close")!;
+  if (title) {
+    let h5 = header.querySelector(".modal-title") as HTMLElement | null;
+    if (!h5) {
+      h5 = document.createElement("h5");
+      h5.className = "modal-title w-100 text-center m-0";
+      header.insertBefore(h5, btnClose);
+    }
+    h5.textContent = title;
+  } else {
+    const h5 = header.querySelector(".modal-title");
+    if (h5) h5.remove();
+  }
+
+  // 标题右侧自定义内容（插在 × 按钮前面）
+  if (headerRight) {
+    const wrap = document.createElement("div");
+    wrap.className = "header-right me-2";
+    wrap.innerHTML = headerRight;
+    header.insertBefore(wrap, btnClose);
+  }
+
+  $("modal-body").innerHTML = bodyHTML;
+  getModal().show();
+}
+
 function closeModal() {
   if (S.flashing) return;
-  $("mask").classList.add("hidden");
-  document.body.classList.remove("no-scroll");  // ← 解锁
+  getModal().hide();
 }
-// 点击遮罩外部 → 不关闭（必须点 × 按钮）
-// $("mask").addEventListener("click", ...) 已移除
 
 /** 单选列表弹窗 */
 function radioModal(
@@ -195,14 +243,13 @@ function radioModal(
   onPick: (raw: any) => void
 ) {
   openModal(
-    `<span class="x">×</span><h3>${title}</h3>` +
-    (desc ? `<div class="desc">${desc}</div>` : "") +
-    `<div class="list" id="mlist">` +
+    (desc ? `<div class="text-muted small text-center mb-3">${desc}</div>` : "") +
+    `<div id="mlist">` +
       items
         .map(
           (it, i) =>
-            `<label class="row" data-i="${i}">` +
-              `<input type="radio" name="pk">` +
+            `<label class="radio-row" data-i="${i}">` +
+              `<input type="radio" class="form-check-input" name="pk">` +
               `<span><span class="t">${it.title}</span>` +
               (it.sub ? `<span class="s">${it.sub}</span>` : "") +
               `</span>` +
@@ -210,20 +257,26 @@ function radioModal(
             `</label>`
         )
         .join("") +
-    `</div>` +
-    `<button class="ok" id="mok" disabled>${okText}</button>`
+    `</div>`,
+    title
   );
+  // 按钮放到 footer
+  const footer = $("modal-footer");
+  footer.innerHTML = `<button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                      <button class="btn btn-primary" id="mok" disabled>${okText}</button>`;
+
   let picked = -1;
-  $("mlist").querySelectorAll(".row").forEach((r) => {
+  const mlist = document.getElementById("mlist")!;
+  mlist.querySelectorAll(".radio-row").forEach((r) => {
     r.addEventListener("click", () => {
-      $("mlist").querySelectorAll(".row").forEach((o) => o.classList.remove("on"));
+      mlist.querySelectorAll(".radio-row").forEach((o) => o.classList.remove("on"));
       r.classList.add("on");
       (r.querySelector("input") as HTMLInputElement).checked = true;
       picked = +(r as HTMLElement).dataset.i!;
-      ($("mok") as HTMLButtonElement).disabled = false;
+      (footer.querySelector("#mok") as HTMLButtonElement).disabled = false;
     });
   });
-  ($("mok") as HTMLButtonElement).onclick = () => {
+  (footer.querySelector("#mok") as HTMLButtonElement).onclick = () => {
     if (picked >= 0) {
       closeModal();
       onPick(items[picked].raw);
@@ -231,7 +284,7 @@ function radioModal(
   };
 }
 
-/** 确认弹窗 */
+/** 确认弹窗（单按钮，560px 宽，底部居中） */
 function confirmModal(
   title: string,
   html: string,
@@ -239,14 +292,19 @@ function confirmModal(
   onOk: () => void
 ) {
   openModal(
-    `<h3>${title}</h3>` +
-    `<div class="warn-icon">⚠️</div>` +
-    `<div class="desc">${html}</div>` +
-    `<button class="ok" id="mok">${okText}</button>` +
-    `<button class="cancel" id="mcancel">取消</button>`
+    `<div class="text-center mb-3" style="font-size:28px">⚠️</div>` +
+    `<div class="text-center text-muted" style="font-size:13px;line-height:1.7">${html}</div>`,
+    title,
+    "",
+    ""   // 不传 size，用默认 modal-md + modal-confirm 类自己控制 560px
   );
-  ($("mok") as HTMLButtonElement).onclick = () => { closeModal(); onOk(); };
-  ($("mcancel") as HTMLButtonElement).onclick = closeModal;
+  // openModal 里会清理 modal-confirm，在这里加回来
+  const dialog = document.getElementById("modal-dialog")!;
+  dialog.classList.add("modal-confirm");
+
+  const footer = $("modal-footer");
+  footer.innerHTML = `<button class="btn btn-primary" id="mok">${okText}</button>`;
+  (footer.querySelector("#mok") as HTMLButtonElement).onclick = () => { closeModal(); onOk(); };
 }
 
 // ---------------------------------------------------------------------------
@@ -374,7 +432,9 @@ function onConnected() {
   // 设备已连接 → 状态区显示引导用户选择
   showStatus("text");
   ($("wiz-text") as HTMLElement).innerHTML =
-    "请选择<b>设备型号</b>、<b>固件版本</b>和<b>波特率</b>。";
+    "请选择设备型号、固件版本和波特率。";
+
+
 
   goto(2);
   setLabel(2, "请在下方列表中选择你的 WLED 型号");
@@ -409,14 +469,15 @@ $("btn-2").addEventListener("click", async () => {
       S.release = await fetchReleaseIndex();
     } catch (e: any) {
       openModal(
-        `<span class="x">×</span><h3>加载固件库失败</h3>` +
-        `<div class="desc" style="color:#e5533c">无法从远程仓库拉取版本信息：${e.message}</div>`
+        `<div class="text-center text-danger mb-2">无法从远程仓库拉取版本信息</div>` +
+        `<div class="text-center text-muted small">${e.message}</div>`,
+        "加载固件库失败"
       );
       return;
     }
   }
 
-  const PICKER_H = "340px";
+  const PICKER_H = "200px";
 
   // 型号按 chip 分组排序，让同芯片型号排在一起
   const chips = Array.from(new Set(WLED_MODELS.map((m) => m.chip)));
@@ -435,25 +496,29 @@ $("btn-2").addEventListener("click", async () => {
   ];
 
   openModal(
-    `<span class="x">×</span><h3>选择型号与固件</h3>` +
-    `<div class="desc">先选择你的板卡型号、固件版本，再挑选烧录波特率</div>` +
+    // `<div class="text-center text-muted small mb-3">先选择你的板卡型号、固件版本，再挑选烧录波特率</div>` +
     `<div style="display:flex;gap:0;border:1px solid #eee;border-radius:8px;overflow:hidden;background:#fff;height:${PICKER_H}">` +
-      `<div style="flex:1;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
+      `<div style="flex:1.2;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">型号</div>` +
         `<div id="c1list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
-      `<div style="flex:1;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
+      `<div style="flex:1.0;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">固件版本</div>` +
         `<div id="c2list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
-      `<div style="flex:0 0 140px;min-width:0;display:flex;flex-direction:column">` +
+      `<div style="flex:0 0 160px;min-width:0;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">波特率</div>` +
         `<div id="c3list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
     `</div>` +
-    `<div id="pick-footer" style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#666"></div>` +
-    `<button class="ok" id="mok" disabled>确认</button>`
+    `<div id="pick-footer" style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#666"></div>`,
+    "选择型号与固件",
+    "",
+    "picker"
   );
+  // 确认按钮放到 footer
+  $("modal-footer").innerHTML =
+    `<button class="btn btn-primary" id="mok" disabled>确认</button>`;
 
   // --- 渲染型号列 ---
   function renderC1() {
@@ -503,14 +568,13 @@ $("btn-2").addEventListener("click", async () => {
       rows.push(groupTitle("稳定版", stable.length));
       stable.forEach((v, i) => {
         const isLatest = i === 0;
-        const off = v.factory ? "0x0" : "0x10000";
         rows.push(
           `<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` +
             `<div style="display:flex;align-items:center;gap:8px">` +
               `<span style="font-weight:600">${v.version}</span>` +
+              `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
               (isLatest ? `<span style="margin-left:auto;font-size:10px;color:#fff;background:var(--brand);padding:1px 6px;border-radius:3px">最新</span>` : "") +
             `</div>` +
-            `<div style="font-size:11px;color:#888;margin-top:2px">${fmtSize(v.size)} · 偏移 ${off} · ${v.factory ? "factory" : "app"}</div>` +
           `</div>`
         );
         idx++;
@@ -519,14 +583,13 @@ $("btn-2").addEventListener("click", async () => {
     if (beta.length) {
       rows.push(groupTitle("预发布 Beta", beta.length));
       beta.forEach((v) => {
-        const off = v.factory ? "0x0" : "0x10000";
         rows.push(
           `<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` +
             `<div style="display:flex;align-items:center;gap:8px">` +
               `<span style="font-weight:600">${v.version}</span>` +
+              `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
               `<span style="margin-left:auto;font-size:10px;color:#fff;background:#f08a24;padding:1px 6px;border-radius:3px">Beta</span>` +
             `</div>` +
-            `<div style="font-size:11px;color:#888;margin-top:2px">${fmtSize(v.size)} · 偏移 ${off} · ${v.factory ? "factory" : "app"}</div>` +
           `</div>`
         );
         idx++;
@@ -642,10 +705,10 @@ function onModelAndFirmwarePicked() {
   b2.style.display = "none";
 
   // label-3 只显示"升级到"，去掉重复的"更换固件"链接
-  setLabel(
-    3,
-    `<b>升级到：</b><br>${p.version} · ${fwName}<br><small>波特率 ${S.baudRate} · ${fmtSize(p.size)}</small>`
-  );
+  // setLabel(
+  //   3,
+  //   `<b>升级到：</b><br>${p.version} · ${fwName}<br><small>波特率 ${S.baudRate} · ${fmtSize(p.size)}</small>`
+  // );
 
   // btn-3 显示出来，彩色可点击
   const b3 = $("btn-3") as HTMLButtonElement;
@@ -748,7 +811,10 @@ async function startFlashing() {
 
 function setPhase(t: string) { ($("p-tip") as HTMLElement).textContent = t; }
 function setProgress(p: number) {
-  ($("p-fill") as HTMLElement).style.width = Math.max(0, Math.min(100, p)) + "%";
+  const pct = Math.max(0, Math.min(100, p));
+  const bar = $("p-fill") as HTMLElement;
+  bar.style.width = pct + "%";
+  bar.setAttribute("aria-valuenow", String(Math.round(pct)));
 }
 // ETA 平滑：存最近 8 次 tick 的剩余秒数，取中位数显示（避免下载/写入切换时剧烈抖动）
 const _etaBuffer: number[] = [];
@@ -812,7 +878,7 @@ function finishOk() {
   const origClick = b1.onclick;  // null
   // 不做 override，onConnected 里的代码已经会隐藏 done-box
 
-  setFoot("烧录完成！请等待设备重启后，可继续烧录下一台设备。");
+  // setFoot("烧录完成！请等待设备重启后，可继续烧录下一台设备。");
 }
 
 function finishErr(msg: string) {
@@ -823,12 +889,15 @@ function finishErr(msg: string) {
   // 烧录失败 → 重置页面（showStatus("text") 由 resetAll 内部调）
   resetAll();
 
-  setTimeout(() => openModal(
-    `<span class="x">×</span><h3 style="color:#e5533c">❌ 烧录失败</h3>` +
-    `<div class="desc">${msg}<br><br>请检查：<br>· USB 线是否稳定<br>· 设备是否被拔出<br>· 波特率是否过高（建议 115200 重试）</div>` +
-    `<button class="ok" id="emok">确定</button>`
-  ), 200);
-  setTimeout(() => { ($("emok") as HTMLElement)?.addEventListener("click", closeModal); }, 300);
+  setTimeout(() => {
+    openModal(
+      `<div class="text-center text-danger-emphasis mb-2" style="font-size:24px">❌ 烧录失败</div>` +
+      `<div class="text-center text-muted small">${msg}</div>` +
+      `<div class="mt-3 small text-muted">请检查：<br>· USB 线是否稳定<br>· 设备是否被拔出<br>· 波特率是否过高（建议 115200 重试）</div>`,
+      "烧录失败"
+    );
+    $("modal-footer").innerHTML = `<button class="btn btn-primary" data-bs-dismiss="modal">确定</button>`;
+  }, 200);
 }
 
 /** 重置页面到初始未连接状态（三步向导重置 + 按钮清空 + 弹窗隐藏） */
@@ -887,11 +956,10 @@ $("btn-forum").addEventListener("click", () => {
 $("btn-log").addEventListener("click", async () => {
   if (!logLines.length) {
     openModal(
-      `<span class="x">×</span><h3>下载日志</h3>` +
-      `<div class="desc">当前没有烧录日志可打包。<br>请先连接设备或执行烧录操作。</div>` +
-      `<button class="ok" id="mok">确定</button>`
+      `<div class="text-center text-muted small">当前没有烧录日志可打包。<br>请先连接设备或执行烧录操作。</div>`,
+      "下载日志"
     );
-    ($("mok") as HTMLButtonElement).onclick = closeModal;
+    $("modal-footer").innerHTML = `<button class="btn btn-primary" data-bs-dismiss="modal">确定</button>`;
     return;
   }
 
@@ -972,9 +1040,11 @@ async function openFirmwareDownloadModal() {
     if (!S.release) S.release = await fetchReleaseIndex();
   } catch (e: any) {
     openModal(
-      `<span class="x">×</span><h3>固件库</h3>` +
-      `<div class="desc" style="color:#e5533c">远程版本拉取失败：${e.message}</div>`
+      `<div class="text-center text-danger mb-2">远程版本拉取失败</div>` +
+      `<div class="text-center text-muted small">${e.message}</div>`,
+      "固件库"
     );
+    $("modal-footer").innerHTML = `<button class="btn btn-primary" data-bs-dismiss="modal">确定</button>`;
     return;
   }
 
@@ -982,17 +1052,16 @@ async function openFirmwareDownloadModal() {
   let vOn: RemoteBinVersion | null = null;                // 选中的版本（stable）
 
   openModal(
-    `<span class="x">×</span>` +
-    `<div style="text-align:center;margin-bottom:10px">` +
-      `<h3 style="margin:0">选择固件</h3>` +
-    `</div>` +
-    `<button id="fwdl" disabled style="position:absolute;right:48px;top:18px;padding:6px 18px;font-size:13px;background:var(--brand);color:#fff;border:none;border-radius:4px;cursor:pointer;opacity:.4;z-index:2">下载</button>` +
     `<div class="picker3" style="height:340px">` +
       `<div class="col c1"><div class="hd">型号</div><div id="fwMlist"></div></div>` +
       `<div class="col c2"><div class="hd">版本号（稳定版）</div><div id="fwVlist"></div></div>` +
     `</div>` +
-    `<div id="fwHint" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:right">请选择型号和版本</div>`
+    `<div id="fwHint" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:right">请选择型号和版本</div>`,
+    "选择固件",
+    `<button class="btn btn-primary btn-sm" id="fwdl" disabled>下载</button>`
   );
+  // footer 清空（下载按钮已移到标题栏右侧）
+  $("modal-footer").innerHTML = "";
 
   // --- 渲染型号列 ---
   function renderM() {
@@ -1052,14 +1121,12 @@ async function openFirmwareDownloadModal() {
     const hint = $("fwHint") as HTMLElement;
     if (!mOn || !vOn) {
       dlBtn.disabled = true;
-      dlBtn.style.opacity = ".4";
       hint.textContent = mOn ? "请选择版本号" : "请选择型号";
       hint.style.color = "#aaa";
       return;
     }
     // 已选好 → 启用下载按钮
     dlBtn.disabled = false;
-    dlBtn.style.opacity = "1";
     hint.textContent = `${mOn.name} → ${vOn.version} · ${fmtSize(vOn.size)}`;
     hint.style.color = "#666";
     dlBtn.onclick = async () => {
@@ -1098,7 +1165,6 @@ async function openFirmwareDownloadModal() {
       } finally {
         dlBtn.disabled = false;
         dlBtn.textContent = "下载";
-        dlBtn.style.opacity = "1";
       }
     };
   }

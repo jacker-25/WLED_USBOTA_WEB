@@ -391,12 +391,13 @@ dist/
 
 ## 启动命令（Windows PowerShell）
 
-cd "g:\htm_file\esp32_flash\esptool-js -2\examples\typescript"
+cd "g:\domraem_Software\wled_usb_ota\wledusb_ota_web\examples\typescript"
 npm.cmd run dev
 
 `npm.cmd` 是关键——PowerShell 默认拦截`npm` （执行策略限制），加`.cmd` 后缀就绕过了。
 
 ## 生产构建
 
-cd "g:\htm_file\esp32_flash\esptool-js -2\examples\typescript"
+cd "g:\domraem_Software\wled_usb_ota\wledusb_ota_web\examples\typescript"
 npm.cmd run build
+
