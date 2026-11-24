@@ -1,0 +1,53 @@
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: "https://registry.npmjs.org"
+      - name: Install dependencies and build 🔧
+        run: npm ci && npm run build
+      - name: Run lint
+        run: npm run lint
+      - name: Run tests
+        run: npm run test
+      - name: Package module
+        run: npm pack
+      - name: Verify tag version is the same as package.json version
+        id: version
+        run: |
+          [ ${GITHUB_REF:11} = $(node -p "require('./package.json').version") ]
+          echo "version=${GITHUB_REF:11}" >> $GITHUB_OUTPUT
+      - name: Upload package file
+        uses: actions/upload-artifact@v7
+        with:
+          name: esptool-js-${{ steps.version.outputs.version }}.tgz
+          path: esptool-js-${{ steps.version.outputs.version }}.tgz
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "./esptool-js-${{ steps.version.outputs.version }}.tgz"
+          name: Espressif ESPTOOL-JS ${{ github.ref }}
+          draft: true
+          body: |
+            ### Release Highlights
+
+            ### Features & Enhancements
+
+            <!-- Insert The Features and Enhancements below as points possibly add the link to the PR/commit -->
+
+            ### Bug Fixes
+
+            <!-- Insert The Bug Fixes below as points, also add relevant links -->
+      - name: Publish package on NPM 📦
+        run: npm publish

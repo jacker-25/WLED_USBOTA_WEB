@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ESP32 Web Flash - 本地版</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#f5f7fa,#c3cfe2);min-height:100vh;margin:0;padding:20px}
+.container{max-width:920px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);overflow:hidden}
+header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:22px 28px}
+h1{margin:0;font-size:24px}
+.sub{opacity:.85;font-size:13px;margin-top:4px}
+.main{padding:24px}
+.section{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:16px;margin-bottom:16px}
+.st{color:#495057;margin:0 0 10px;font-size:15px;font-weight:600;display:flex;gap:8px;align-items:center}
+.badge{background:#667eea;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.btn{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;padding:10px 22px;border-radius:6px;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{background:#adb5bd;cursor:not-allowed}
+.btn2{background:#6c757d}.btn3{background:#28a745}.btn4{background:#dc3545}
+.btng{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+input[type=file],select,input[type=text]{padding:8px 12px;border:2px solid #dee2e6;border-radius:6px;font-size:14px}
+input[type=file]{width:100%;border-style:dashed}
+.fi{background:#fff;border:1px solid #dee2e6;border-radius:6px;padding:8px 12px;font-size:13px;margin-top:6px;display:none}
+.cinfo{background:#e7f1ff;border:1px solid #b3d7ff;border-radius:8px;padding:12px;margin:10px 0;display:none}
+.cinfo h4{margin:0 0 6px;color:#0066cc}
+.ci{display:flex;margin-bottom:3px}.cil{font-weight:600;min-width:90px}
+.sb{padding:10px 16px;border-radius:8px;font-weight:600;text-align:center;margin:10px 0}
+.s0{background:#e9ecef}.s1{background:#fff3cd;color:#856404}.s2{background:#d4edda;color:#155724}.s3{background:#cce5ff;color:#004085}.s4{background:#f8d7da;color:#721c24}
+.pbar{height:10px;background:#e9ecef;border-radius:5px;overflow:hidden;margin:8px 0}
+.pfill{height:100%;background:linear-gradient(90deg,#28a745,#20c997);width:0;transition:width .3s}
+.ptxt{text-align:center;color:#6c757d;font-size:13px}
+.lc{background:#212529;color:#e9ecef;border-radius:8px;overflow:hidden;margin-top:14px}
+.lh{background:#343a40;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.lb{padding:12px;height:250px;overflow-y:auto;font:13px/1.5 Consolas,Monaco,monospace}
+.ll{margin:2px 0;white-space:pre-wrap}
+.tm{color:#6c757d}.ti{color:#17a2b8}.ts{color:#28a745}.te{color:#dc3545}.tw{color:#ffc107}
+.dinfo{font-size:11px;color:#6c757d;background:#f8f9fa;padding:8px;border-radius:6px;margin-top:8px}
+.tips{background:#fff3cd;border:1px solid #ffeaa7;border-radius:6px;padding:10px;margin:8px 0;color:#856404;font-size:13px}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+ <h1>🔧 ESP32 Web Flash</h1>
+ <div class="sub">基于 esptool-js 本地运行版 · 支持自动下载电路</div>
+</header>
+<div class="main">
+
+ <div id="sb" class="sb s0">准备就绪</div>
+
+ <!-- 第1步：连接 -->
+ <div class="section">
+  <div class="st"><span class="badge">1</span>设备连接</div>
+  <div class="tips">
+   <b>自动下载电路已适配：</b>软件自动控制 DTR/RTS 进入烧录模式<br>
+   只需将 ESP32 通过 USB 连接到电脑，点击下方按钮即可
+  </div>
+  <div class="btng">
+   <button class="btn" id="btnConn">🔗 连接设备</button>
+   <button class="btn btn2" id="btnDisc" disabled>断开连接</button>
+  </div>
+  <div class="cinfo" id="cinfo">
+   <h4>🔌 芯片信息</h4>
+   <div class="ci"><span class="cil">型号:</span><span id="ciModel">-</span></div>
+   <div class="ci"><span class="cil">MAC:</span><span id="ciMac">-</span></div>
+   <div class="ci"><span class="cil">Flash:</span><span id="ciFlash">-</span></div>
+  </div>
+ </div>
+
+ <!-- 第2步：固件 -->
+ <div class="section">
+  <div class="st"><span class="badge">2</span>固件文件</div>
+  <input type="file" id="inpFile" accept=".bin">
+  <div class="fi" id="finfo"></div>
+  <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+   <div>
+    <label style="font-size:13px;font-weight:600">起始地址</label><br>
+    <select id="selAddr">
+     <option value="0x0">0x0 合并固件</option>
+     <option value="0x1000">0x1000 Bootloader</option>
+     <option value="0x8000">0x8000 分区表</option>
+     <option value="0x10000" selected>0x10000 App</option>
+    </select>
+   </div>
+   <div>
+    <label style="font-size:13px;font-weight:600">自定义地址</label><br>
+    <input type="text" id="txtAddr" placeholder="0x10000" style="width:120px">
+   </div>
+  </div>
+ </div>
+
+ <!-- 第3步：设置 -->
+ <div class="section">
+  <div class="st"><span class="badge">3</span>烧录设置</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap">
+   <div>
+    <label style="font-size:13px;font-weight:600">波特率</label><br>
+    <select id="selBaud">
+     <option value="921600">921600</option>
+     <option value="460800">460800</option>
+     <option value="230400">230400</option>
+     <option value="115200" selected>115200(推荐)</option>
+    </select>
+   </div>
+   <div>
+    <label style="font-size:13px;font-weight:600">Flash模式</label><br>
+    <select id="selFM"><option value="keep">keep</option><option value="dio" selected>DIO</option><option value="qio">QIO</option></select>
+   </div>
+   <div>
+    <label style="font-size:13px;font-weight:600">Flash频率</label><br>
+    <select id="selFF"><option value="keep">keep</option><option value="80m" selected>80MHz</option><option value="40m">40MHz</option></select>
+   </div>
+   <div>
+    <label style="font-size:13px;font-weight:600">Flash大小</label><br>
+    <select id="selFS"><option value="detect" selected>detect</option><option value="4MB">4MB</option><option value="8MB">8MB</option><option value="16MB">16MB</option></select>
+   </div>
+  </div>
+  <div style="margin-top:8px">
+   <input type="checkbox" id="chkErase"><label for="chkErase" style="font-size:13px">擦除整片Flash</label>
+   <input type="checkbox" id="chkDebug" style="margin-left:12px"><label for="chkDebug" style="font-size:13px">显示调试日志</label>
+  </div>
+ </div>
+
+ <!-- 第4步：操作 -->
+ <div class="section">
+  <div class="st"><span class="badge">4</span>操作</div>
+  <div class="btng">
+   <button class="btn btn3" id="btnFlash" disabled>🚀 开始烧录</button>
+   <button class="btn btn4" id="btnErase" disabled>🗑️ 擦除Flash</button>
+   <button class="btn btn2" id="btnStop" disabled>⏹ 停止</button>
+  </div>
+  <div class="pbar"><div class="pfill" id="pFill"></div></div>
+  <div class="ptxt" id="pTxt">等待操作…</div>
+ </div>
+
+ <!-- 日志 -->
+ <div class="lc">
+  <div class="lh"><span>📋 日志</span><button class="btn btn2" style="padding:4px 10px;font-size:12px" id="btnClr">清屏</button></div>
+  <div class="lb" id="logBox"></div>
+ </div>
+ <div class="dinfo">浏览器:<span id="bi"></span> | WebSerial:<span id="ws"></span> | 基于 esptool-js 本地运行版</div>
+</div>
+
+<script type="module">
+// ===== 使用 ES Module 方式导入 esptool-js =====
+// 从本地运行的官方示例中导入
+import {
+  ESPLoader,
+  Transport,
+  ClassicReset,
+  CustomReset,
+  validateCustomResetStringSequence
+} from "https://cdn.jsdelivr.net/npm/esptool-js@2.3.0/+esm";
+
+// ===== 全局变量 =====
+let port = null;
+let transport = null;
+let espl = null;
+let connected = false;
+let flashing = false;
+let erasing = false;
+let firmFile = null;
+
+const logBox = document.getElementById('logBox');
+const sb = document.getElementById('sb');
+const cinfo = document.getElementById('cinfo');
+
+// ===== 工具函数 =====
+function log(text, cls = 'ti') {
+  const d = document.createElement('div');
+  d.className = 'll';
+  const time = new Date().toTimeString().slice(0, 8);
+  d.innerHTML = `<span class="tm">[${time}]</span> <span class="${cls}">${text}</span>`;
+  logBox.appendChild(d);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function setStatus(text, code) {
+  sb.textContent = text;
+  sb.className = 'sb s' + code;
+}
+
+function updateButtons() {
+  document.getElementById('btnFlash').disabled = !(connected && firmFile && !flashing && !erasing);
+  document.getElementById('btnErase').disabled = !(connected && !flashing && !erasing);
+  document.getElementById('btnStop').disabled = !(flashing || erasing);
+  document.getElementById('btnDisc').disabled = !connected;
+}
+
+function setProgress(pct, text) {
+  document.getElementById('pFill').style.width = pct + '%';
+  document.getElementById('pTxt').textContent = text || pct + '%';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ===== 自定义复位策略（适配CH340自动下载电路）=====
+// 与官方ESP Tool相同的复位时序
+// 标准自动下载电路：DTR -> EN, RTS -> GPIO0(BOOT)
+function createCustomResetStrategy() {
+  // CH340 自动下载电路的标准时序
+  // DTR=0(EN=1), RTS=1(BOOT=0) -> 等待100ms -> DTR=1(EN=0), RTS=0(BOOT=0) -> 等待50ms -> DTR=0(EN=1), RTS=0(BOOT=1)
+  const customSequence = "D0|R1|W100|D1|R0|W50|D0|R0";
+  
+  if (!validateCustomResetStringSequence(customSequence)) {
+    log('自定义复位时序验证失败', 'te');
+    return null;
+  }
+  
+  log('已配置自动下载电路复位时序', 'ti');
+  
+  return {
+    customReset: (transport) => new CustomReset(transport, customSequence)
+  };
+}
+
+// ===== 连接设备 =====
+async function doConnect() {
+  try {
+    setStatus('正在连接…', '1');
+    log('请求串口权限…');
+    
+    port = await navigator.serial.requestPort();
+    const baud = parseInt(document.getElementById('selBaud').value);
+    
+    await port.open({
+      baudRate: baud,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'none',
+      flowControl: 'none'
+    });
+    log('串口已打开，波特率: ' + baud, 'ts');
+    
+    // 创建 Transport（与官方示例一致）
+    transport = new Transport(port, true);
+    
+    // 配置复位策略
+    const resetConstructors = createCustomResetStrategy();
+    
+    // 创建 ESPLoader
+    const debugLogging = document.getElementById('chkDebug').checked;
+    espl = new ESPLoader({
+      transport: transport,
+      baudrate: baud,
+      terminal: {
+        clean: function() {},
+        writeLine: function(data) { 
+          if (debugLogging) log('[ESP] ' + data, 'ti'); 
+        },
+        write: function(data) {}
+      },
+      debugLogging: debugLogging,
+      resetConstructors: resetConstructors
+    });
+    
+    // 连接并检测芯片
+    log('正在连接 ESP32…', 'ti');
+    const chipName = await espl.main("customReset");
+    
+    const mac = espl.mac_addr_str || '-';
+    const fsize = espl.flash_size || '-';
+    
+    log('✅ 连接成功！芯片: ' + chipName, 'ts');
+    log('MAC: ' + mac, 'ti');
+    log('Flash: ' + fsize, 'ti');
+    
+    connected = true;
+    cinfo.style.display = 'block';
+    document.getElementById('ciModel').textContent = chipName;
+    document.getElementById('ciMac').textContent = mac;
+    document.getElementById('ciFlash').textContent = fsize;
+    setStatus('已连接 - ' + chipName, '2');
+    updateButtons();
+    
+  } catch (e) {
+    log('❌ 连接失败: ' + e.message, 'te');
+    setStatus('连接失败', '4');
+    await doDisconnect();
+  }
+}
+
+// ===== 断开设备 =====
+async function doDisconnect() {
+  try {
+    if (espl) {
+      try { await espl.transport.disconnect(); } catch(e) {}
+    }
+    if (port) {
+      try { await port.close(); } catch(e) {}
+    }
+  } catch(e) {}
+  
+  port = null;
+  transport = null;
+  espl = null;
+  connected = false;
+  flashing = false;
+  erasing = false;
+  
+  cinfo.style.display = 'none';
+  setStatus('已断开', '0');
+  updateButtons();
+  log('设备已断开', 'ti');
+}
+
+// ===== 擦除Flash =====
+async function doErase() {
+  if (!connected || erasing || flashing) return;
+  
+  erasing = true;
+  updateButtons();
+  setStatus('正在擦除…', '3');
+  
+  try {
+    log('正在擦除 Flash…', 'tw');
+    setProgress(10, '擦除中…');
+    
+    await espl.erase_flash();
+    
+    setProgress(100, '擦除完成');
+    log('✅ Flash 擦除完成', 'ts');
+    setStatus('擦除完成', '2');
+    
+  } catch (e) {
+    log('❌ 擦除失败: ' + e.message, 'te');
+    setStatus('擦除失败', '4');
+  } finally {
+    erasing = false;
+    updateButtons();
+  }
+}
+
+// ===== 烧录固件 =====
+async function doFlash() {
+  if (!connected || !firmFile || flashing || erasing) return;
+  
+  flashing = true;
+  updateButtons();
+  setStatus('烧录中…', '3');
+  
+  try {
+    const addrStr = document.getElementById('txtAddr').value || document.getElementById('selAddr').value;
+    const baseAddr = parseInt(addrStr, 16);
+    if (isNaN(baseAddr)) throw new Error('非法地址: ' + addrStr);
+    
+    log('固件: ' + firmFile.name + ' @ ' + addrStr, 'ti');
+    
+    const buf = new Uint8Array(await firmFile.arrayBuffer());
+    log('文件大小: ' + (buf.length / 1024).toFixed(1) + ' KB', 'ti');
+    
+    const fileArr = [{ data: buf, address: baseAddr }];
+    
+    // 获取Flash参数
+    const flashSize = document.getElementById('selFS').value;
+    const flashMode = document.getElementById('selFM').value;
+    const flashFreq = document.getElementById('selFF').value;
+    
+    // 如果需要擦除
+    if (document.getElementById('chkErase').checked) {
+      log('正在擦除 Flash…', 'tw');
+      setProgress(2, '擦除 Flash…');
+      await espl.erase_flash();
+      log('Flash 擦除完成', 'ts');
+    }
+    
+    // 写入Flash（与官方示例一致的调用方式）
+    setProgress(5, '开始写入…');
+    log('正在写入固件…', 'ti');
+    
+    await espl.write_flash({
+      fileArray: fileArr,
+      flashParams: {
+        flashSize: flashSize,
+        flashMode: flashMode,
+        flashFreq: flashFreq
+      },
+      compress: true,
+      eraseAll: false,
+      reportProgress: function(written, total) {
+        var pct = 5 + Math.round(written / total * 93);
+        setProgress(pct, '写入 ' + Math.round(written/1024) + '/' + Math.round(total/1024) + ' KB (' + pct + '%)');
+      }
+    });
+    
+    // 复位设备
+    setProgress(98, '复位中…');
+    log('烧录完成，正在复位…', 'ti');
+    await espl.hard_reset();
+    
+    setProgress(100, '烧录完成 ✓');
+    log('✅ 烧录完成！设备已复位', 'ts');
+    setStatus('烧录完成', '2');
+    
+  } catch (e) {
+    log('❌ 烧录失败: ' + e.message, 'te');
+    setStatus('烧录失败', '4');
+  } finally {
+    flashing = false;
+    updateButtons();
+  }
+}
+
+// ===== 事件绑定 =====
+document.getElementById('btnConn').onclick = doConnect;
+document.getElementById('btnDisc').onclick = doDisconnect;
+document.getElementById('btnFlash').onclick = doFlash;
+document.getElementById('btnErase').onclick = doErase;
+document.getElementById('btnStop').onclick = function() {
+  if (flashing || erasing) {
+    log('正在停止…', 'tw');
+    doDisconnect();
+  }
+};
+document.getElementById('btnClr').onclick = function() {
+  logBox.innerHTML = '';
+};
+
+document.getElementById('inpFile').onchange = function(e) {
+  if (e.target.files[0]) {
+    firmFile = e.target.files[0];
+    var kb = (firmFile.size / 1024).toFixed(1);
+    var fi = document.getElementById('finfo');
+    fi.style.display = 'block';
+    fi.textContent = '📁 ' + firmFile.name + ' (' + kb + ' KB)';
+    log('已选择固件: ' + firmFile.name, 'ts');
+  } else {
+    firmFile = null;
+    document.getElementById('finfo').style.display = 'none';
+  }
+  updateButtons();
+};
+
+// ===== 初始化 =====
+var ua = navigator.userAgent;
+document.getElementById('bi').textContent = ua.includes('Edg') ? 'Edge' : ua.includes('Chrome') ? 'Chrome' : '其他';
+document.getElementById('ws').textContent = 'serial' in navigator ? '✅' : '❌';
+
+if (!('serial' in navigator)) {
+  log('❌ 当前浏览器不支持 Web Serial API', 'te');
+}
+
+updateButtons();
+log('🚀 ESP32 Web Flash 已加载', 'ts');
+log('使用 ES Module 方式加载 esptool-js', 'ti');
+log('提示: 插好 USB，点击"连接设备"即可自动进入烧录模式', 'ti');
+</script>
+</body>
+</html>
