@@ -333,7 +333,7 @@ $("btn-1").addEventListener("click", async () => {
   }
 
   try {
-    setFoot("正在请求串口权限…");
+    // setFoot("正在请求串口权限…");
     if (CONFIG.LOG_WINDOW) logBox.classList.add("show");
 
     // requestPort 必须留在 click 同步栈里
@@ -747,6 +747,12 @@ async function startFlashing() {
   ($("btn-2") as HTMLButtonElement).disabled = true;
   ($("btn-3") as HTMLButtonElement).disabled = true;
 
+  // 烧录过程中隐藏"更换型号/固件"链接（避免用户误以为可以改）
+  setLabel(
+    2,
+    `<b>当前设备：</b><br>${m.name}<br><small>${m.chip} · ${m.note}</small>`
+  );
+
   // 显示进度条
   showStatus("flash");
   setPhase("准备中…");
@@ -757,40 +763,37 @@ async function startFlashing() {
   logInfo(`芯片：${m.chip} · Flash ${m.flashMb}MB · 固件包：${m.bin}`);
 
   S.t0 = Date.now();
-  _etaBuffer.length = 0;   // 清空 ETA 平滑缓冲
-  S.timer = window.setInterval(tickEta, 1000);
+  _flashStartMs = 0; _etaShown = 60;
+  // timer 延迟到烧录开始再启动（下载阶段不算 ETA）
+  // S.timer 在下面"固件下载完成后"启动
 
   try {
-    // ---- 1) 双源竞速拉固件 ----
-    setPhase("正在下载固件…");
-    let last = 0;
-    const buf = await raceFetchFirmware(p, (loaded, total) => {
-      if (total) {
-        const pct = Math.round((loaded / total) * 100);
-        if (pct !== last) {
-          last = pct;
-          setProgress(Math.floor(pct / 2));  // 下载占前半段进度
-        }
-      }
-    });
+    // ---- 1) 双源竞速拉固件（进度条不动，标题纯文字）----
+    setPhase("固件下载中…");
+    setProgress(0);
+    const buf = await raceFetchFirmware(p);   // 不传回调，进度条不动
     const data = new Uint8Array(buf);
     logOk(`固件下载完成，${fmtSize(data.length)} · 来源竞速（GitHub vs Gitee）`);
 
-    // ---- 2) esptool-js 烧录 ----
+    // ---- 2) esptool-js 烧录（进度条 0-100%，带 ETA）----
+    // 下载完成 → 启动 ETA 计时器
+    S.t0 = Date.now();
+    _flashStartMs = 0; _etaShown = 60;
+    S.timer = window.setInterval(tickEta, 1000);
+
     const offset = p.factory ? 0 : 0x10000;
-    setPhase("正在擦除并写入…");
+    setProgress(0);   // 烧录进度从 0 开始
 
     const flashOptions: FlashOptions = {
       fileArray: [{ data, address: offset }],
       flashMode: "keep",
       flashFreq: "keep",
       flashSize: "keep",
-      eraseAll: false,         // 保留 NVS 参数（WiFi 配置、绑定 token 等），仅擦写固件覆盖扇区
+      eraseAll: false,
       compress: true,
       reportProgress: (_fileIndex, written, total) => {
         const pct = Math.round((written / total) * 100);
-        setProgress(50 + Math.floor(pct / 2));  // 烧录占后半段
-        // 不再 setPhase，让 tickEta 每秒统一更新倒计时
+        setProgress(pct);  // 直接 0-100%
       },
       calculateMD5Hash: (image: Uint8Array) => {
         const latin1 = Array.from(image, (b) => String.fromCharCode(b)).join("");
@@ -816,31 +819,48 @@ function setProgress(p: number) {
   bar.style.width = pct + "%";
   bar.setAttribute("aria-valuenow", String(Math.round(pct)));
 }
-// ETA 平滑：存最近 8 次 tick 的剩余秒数，取中位数显示（避免下载/写入切换时剧烈抖动）
-const _etaBuffer: number[] = [];
+// ETA 算法：烧录阶段（progress > 0）才显示倒计时
+// 下载阶段 progress = 0：由 startFlashing 自己 setPhase("固件下载中…")，这里不覆盖
+// 烧录阶段 progress 0-100%：tickEta 每秒统一更新倒计时
+let _flashStartMs = 0;   // 烧录开始时间戳
+let _etaShown = 60;     // 当前显示的 ETA（秒），初始值 60s
 
 function tickEta() {
-  const w = parseFloat(($("p-fill") as HTMLElement).style.width) || 0;
-  if (w < 2) return;   // 刚开始不稳定，不算
+  const bar = $("p-fill") as HTMLElement;
+  const w = parseFloat(bar.style.width) || 0;
 
-  const elapsed = (Date.now() - S.t0) / 1000;
-  const eta = (elapsed / w) * (100 - w);
+  // 下载阶段（progress 还没动），不覆盖 setPhase
+  if (w <= 1) return;
 
-  _etaBuffer.push(eta);
-  if (_etaBuffer.length > 8) _etaBuffer.shift();
+  // 快烧完了（≥95%），ETA 直接归零，不再显示 00:01 卡住
+  if (w >= 95) {
+    setPhase("正在写入固件，即将完成…");
+    return;
+  }
 
-  // 中位数过滤极端值
-  const sorted = [..._etaBuffer].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const stableEta = sorted.length >= 4
-    ? sorted[mid]
-    : eta;
+  if (_flashStartMs === 0) {
+    _flashStartMs = Date.now();
+    _etaShown = 60;
+    return;
+  }
 
-  const bounded = Math.max(1, Math.min(stableEta, 7200));
-  const mm = String(Math.floor(bounded / 60)).padStart(2, "0");
-  const ss = String(Math.max(0, Math.floor(bounded % 60))).padStart(2, "0");
-  const label = w <= 50 ? "正在下载固件" : "正在写入固件";
-  setPhase(`${label}，预计剩余 ${mm}:${ss}`);
+  const phaseSec = (Date.now() - _flashStartMs) / 1000;
+  if (phaseSec < 1) return;
+
+  // 整体平均速率
+  const avgRate = w / phaseSec;
+  if (avgRate > 0.5) {
+    const eta = Math.max(1, (100 - w) / avgRate);
+    // 单调递减
+    if (eta < _etaShown) _etaShown = eta;
+  }
+
+  // 软递减
+  _etaShown = Math.max(1, _etaShown - 0.5);
+
+  const mm = String(Math.floor(_etaShown / 60)).padStart(2, "0");
+  const ss = String(Math.floor(_etaShown % 60)).padStart(2, "0");
+  setPhase(`正在写入固件，预计剩余 ${mm}:${ss}`);
 }
 
 function finishOk() {
