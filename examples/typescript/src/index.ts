@@ -1135,20 +1135,10 @@ async function openFirmwareDownloadModal() {
       dlBtn.textContent = "下载中...";
       hint.textContent = "正在拉取固件，请稍候…";
       try {
-        const urls = [vOn.url_github, vOn.url_gitee].filter(Boolean);
+        // 统一走 raceFetchFirmware（受 GITEE_ONLY 开关控制，用 Gitee API v5）
+        const buf = await raceFetchFirmware(vOn);
         const fwName = `${mOn.bin}_${vOn.version}.bin`;
-        // 竞速下载（GitHub + Gitee，谁先响用谁）
-        const urlsFull = urls.map(u => u.includes("?") ? `${u}&t=${Date.now()}` : `${u}?t=${Date.now()}`);
-        const controllers: AbortController[] = [];
-        const tasks = urlsFull.map(u => (async () => {
-          const ctrl = new AbortController(); controllers.push(ctrl);
-          const resp = await fetch(u, { signal: ctrl.signal, cache: "no-store" });
-          if (!resp.ok) throw new Error("HTTP " + resp.status);
-          return await resp.blob();
-        })());
-        const blob = await Promise.any(tasks);
-        controllers.forEach(c => c.abort());
-        // 触发浏览器下载（用 Blob URL，不会导致空白）
+        const blob = new Blob([buf], { type: "application/octet-stream" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;

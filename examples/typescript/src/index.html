@@ -249,6 +249,21 @@ body{
   font-size:11px;color:var(--bs-primary);transition:.2s;white-space:nowrap;
 }
 
+/* ======== 响应式：窄屏隐藏文字标签、缩小图标、防挤压 ======== */
+@media (max-width: 900px){
+  .ta-btn .lbl{ display:none; }           /* 文字标签隐藏，只留图标 */
+  .ta-btn .icon-wrap{ width:32px;height:32px; }
+  .top-actions{ gap:8px; top:10px; right:14px; }
+  .ta-btn{ padding:2px 4px; gap:0; }
+  .page-card{ padding:40px 24px 32px; }  /* 顶部 padding 加大，标题不被挡 */
+  .wiz-status{ margin-top:52px; }          /* 标题和图标保持距离 */
+}
+@media (max-width: 560px){
+  .top-actions{ position:static; justify-content:center; margin-bottom:12px; }
+  .page-card{ padding:24px 16px 24px; }
+  .wiz-status{ margin-top:12px; }
+}
+
 /* ======== 固件下载弹窗：三列联动 ======== */
 .picker3{display:flex;border:1px solid #eee;border-radius:6px;overflow:hidden;height:320px}
 .picker3 .col{flex:1;overflow:auto;min-width:0}

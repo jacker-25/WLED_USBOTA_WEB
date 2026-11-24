@@ -22,9 +22,39 @@ const OWNER  = "jacker-25";
 const REPO   = "WLED-Firmware-Collection";
 const BRANCH = "main";
 
+// GitHub raw：有完整 CORS (Access-Control-Allow-Origin: *)
 const GH_RAW    = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}`;
-const GITEE_RAW = `https://gitee.com/${OWNER}/${REPO}/raw/${BRANCH}`;
-// =========================
+// Gitee API v5：也有完整 CORS！替代旧的 /raw/ 端点
+const GITEE_API = `https://gitee.com/api/v5/repos/${OWNER}/${REPO}/contents`;
+
+// ====== 源选择开关：true=仅 Gitee，false=GitHub+Gitee 双源竞速 ======
+const GITEE_ONLY = false;
+// =================================================================
+
+/** Gitee API 返回 base64，需要 decode。UTF-8 兼容 */
+function b64ToUtf8(b64: string): string {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder("utf-8").decode(bytes);
+}
+
+/** Gitee API 返回 base64，decode 成 ArrayBuffer（固件文件用） */
+function b64ToBuf(b64: string): ArrayBuffer {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+
+/** 把 release.json 里的 url_gitee (raw URL) 转成 API v5 URL */
+function giteeRawToApi(rawUrl: string): string {
+  // https://gitee.com/xxx/yyy/raw/main/firmwares/...
+  // → https://gitee.com/api/v5/repos/xxx/yyy/contents/firmwares/...
+  const m = rawUrl.match(/^https:\/\/gitee\.com\/([^/]+)\/([^/]+)\/raw\/([^/]+)\/(.+)$/);
+  if (m) return `https://gitee.com/api/v5/repos/${m[1]}/${m[2]}/contents/${m[4]}`;
+  return rawUrl;
+}
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 分钟（推完仓库后最多等 5 分钟生效）
 const CACHE_PREFIX = "fw_src_";
@@ -75,7 +105,25 @@ export interface MetaIndex {
 // ---------------------------------------------------------------------------
 
 /**
+ * 解析一个 fetch 响应：自动识别 GitHub raw（纯 JSON）和 Gitee API（base64 包裹）
+ */
+async function parseIndexResponse(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    const obj = JSON.parse(text);
+    // Gitee API 返回 { encoding: "base64", content: "..." }
+    if (obj && obj.encoding === "base64" && obj.content) {
+      return JSON.parse(b64ToUtf8(obj.content));
+    }
+    return obj; // GitHub raw 直接就是 JSON
+  } catch {
+    throw new Error("JSON parse fail: " + text.slice(0, 80));
+  }
+}
+
+/**
  * 用多个 URL 竞速，返回第一个成功的 JSON。
+ * GitHub raw 和 Gitee API v5 都走这里，内部自动处理响应格式差异。
  * 成功后写入 localStorage 缓存，失败则回退到缓存。
  */
 async function raceFetchJSON<T>(
@@ -93,16 +141,20 @@ async function raceFetchJSON<T>(
     }
   } catch { /* ignore */ }
 
-  // 2) 构造双源完整 URL + cache-buster
+  // 2) 构造源 URL + cache-buster
   const cacheBuster = `t=${Date.now()}`;
-  const urls = paths.flatMap((p) => {
-    const full = p.startsWith("http") ? p : `${GH_RAW}/${p}`;
-    const full2 = p.startsWith("http") ? p : `${GITEE_RAW}/${p}`;
-    return [
-      full.includes("?") ? `${full}&${cacheBuster}` : `${full}?${cacheBuster}`,
-      full2.includes("?") ? `${full2}&${cacheBuster}` : `${full2}?${cacheBuster}`,
-    ];
-  });
+  const urls: string[] = [];
+  for (const p of paths) {
+    const isAbs = p.startsWith("http");
+    if (!GITEE_ONLY) {
+      // GitHub raw（有 CORS）
+      const gh = isAbs ? p : `${GH_RAW}/${p}`;
+      urls.push(gh.includes("?") ? `${gh}&${cacheBuster}` : `${gh}?${cacheBuster}`);
+    }
+    // Gitee API v5（有 CORS！替代旧的 /raw/ 端点）
+    const gitee = isAbs ? giteeRawToApi(p) : `${GITEE_API}/${p}`;
+    urls.push(gitee.includes("?") ? `${gitee}&${cacheBuster}` : `${gitee}?${cacheBuster}`);
+  }
 
   // 3) 竞速请求（强制绕过 HTTP 缓存）
   const controllers: AbortController[] = [];
@@ -113,7 +165,7 @@ async function raceFetchJSON<T>(
       try {
         const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
         if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
+        const data = await parseIndexResponse(res);
         return { data, url };
       } catch {
         throw new Error("fetch fail: " + url);
@@ -150,29 +202,51 @@ async function raceFetchJSON<T>(
 
 /**
  * 固件文件的双源竞速下载（ArrayBuffer）。
- * 传一个 RemoteBinVersion 进来，自动用 url_github / url_gitee 竞速。
+ * GitHub raw 走流式下载，Gitee API v5 走 base64 decode。
  */
 export async function raceFetchFirmware(
   entry: RemoteBinVersion,
   onProgress?: (loaded: number, total: number) => void
 ): Promise<ArrayBuffer> {
   const ts = Date.now();
-  const urls = [entry.url_github, entry.url_gitee]
-    .filter(Boolean)
-    .map((u) => (u.includes("?") ? `${u}&t=${ts}` : `${u}?t=${ts}`));
-  if (!urls.length) throw new Error("固件 URL 为空");
+
+  // 构造带类型标记的 URL：GitHub raw (stream) + Gitee API v5 (base64)
+  type UrlTask = { url: string; kind: "stream" | "api" };
+  const urlTasks: UrlTask[] = [];
+  if (!GITEE_ONLY && entry.url_github) {
+    const u = entry.url_github.includes("?") ? `${entry.url_github}&t=${ts}` : `${entry.url_github}?t=${ts}`;
+    urlTasks.push({ url: u, kind: "stream" });
+  }
+  if (entry.url_gitee) {
+    const apiUrl = giteeRawToApi(entry.url_gitee);
+    const u = apiUrl.includes("?") ? `${apiUrl}&t=${ts}` : `${apiUrl}?t=${ts}`;
+    urlTasks.push({ url: u, kind: "api" });
+  }
+  if (!urlTasks.length) throw new Error("固件 URL 为空");
 
   const controllers: AbortController[] = [];
-  const fetchTasks = urls.map((url) =>
+  const fetchTasks = urlTasks.map(({ url, kind }) =>
     (async () => {
       const ctrl = new AbortController();
       controllers.push(ctrl);
       try {
         const resp = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
         if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+        if (kind === "api") {
+          // Gitee API v5：返回 base64 JSON
+          const obj = await resp.json();
+          if (obj?.encoding === "base64" && obj.content) {
+            const buf = b64ToBuf(obj.content);
+            onProgress?.(buf.byteLength, buf.byteLength);
+            return buf;
+          }
+          throw new Error("Gitee API 响应格式不对");
+        }
+
+        // GitHub raw：流式读取
         const total = resp.headers.get("content-length")
-          ? parseInt(resp.headers.get("content-length")!, 10)
-          : 0;
+          ? parseInt(resp.headers.get("content-length")!, 10) : 0;
         const reader = resp.body!.getReader();
         const chunks: Uint8Array[] = [];
         let loaded = 0;
@@ -183,7 +257,6 @@ export async function raceFetchFirmware(
           loaded += value.byteLength;
           onProgress?.(loaded, total);
         }
-        // 合并
         const merged = new Uint8Array(loaded);
         let offset = 0;
         for (const c of chunks) { merged.set(c, offset); offset += c.byteLength; }
@@ -198,8 +271,8 @@ export async function raceFetchFirmware(
     const first = await Promise.any(fetchTasks);
     controllers.forEach((c) => c.abort());
     return first;
-  } catch {
-    throw new Error(`固件下载失败：${entry.version}（GitHub + Gitee 均不可达）`);
+  } catch (err: any) {
+    throw new Error(`固件下载失败：${entry.version}（${err?.message || "全部源不可达"}）`);
   }
 }
 
