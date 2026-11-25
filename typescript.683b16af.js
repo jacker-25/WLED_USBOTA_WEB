@@ -9039,7 +9039,7 @@ function $382e02c9bbd5d50b$var$getModal() {
  * @param bodyHTML    要放进 modal-body 的 HTML
  * @param title       顶部标题（可选）
  * @param headerRight 标题右侧、× 左边的自定义 HTML（可选，比如下载按钮）
- * @param size        弹窗尺寸：'sm' | '' (默认 md) | 'lg' | 'xl' | 'picker' (自定义 680px)
+ * @param size        弹窗尺寸：'sm' | '' (默认 md) | 'lg' | 'xl' | 'picker' (三列选择器) | 'firmware' (固件下载)
  */ function $382e02c9bbd5d50b$var$openModal(bodyHTML, title = "", headerRight = "", size = "lg") {
     // 清理 footer + header 右侧残留
     $382e02c9bbd5d50b$var$$("modal-footer").innerHTML = "";
@@ -9048,8 +9048,9 @@ function $382e02c9bbd5d50b$var$getModal() {
     const oldRight = header.querySelector(".header-right");
     if (oldRight) oldRight.remove();
     // 动态切换尺寸 class
-    dialog.classList.remove("modal-sm", "modal-lg", "modal-xl", "modal-dialog-scrollable", "modal-confirm", "modal-picker");
+    dialog.classList.remove("modal-sm", "modal-lg", "modal-xl", "modal-dialog-scrollable", "modal-confirm", "modal-picker", "modal-firmware");
     if (size === "picker") dialog.classList.add("modal-lg", "modal-picker"); // 用 lg 作为基础，CSS 覆盖 max-width
+    else if (size === "firmware") dialog.classList.add("modal-lg", "modal-firmware");
     else if (size) dialog.classList.add("modal-" + size);
     // 填充 header title
     const btnClose = header.querySelector(".btn-close");
@@ -9139,7 +9140,7 @@ $382e02c9bbd5d50b$var$$("btn-1").addEventListener("click", async ()=>{
         return;
     }
     try {
-        // setFoot("正在请求串口权限…");
+        $382e02c9bbd5d50b$var$setFoot("\u6B63\u5728\u8BF7\u6C42\u4E32\u53E3\u6743\u9650\u2026");
         if ($382e02c9bbd5d50b$var$CONFIG.LOG_WINDOW) $382e02c9bbd5d50b$var$logBox.classList.add("show");
         // requestPort 必须留在 click 同步栈里
         $382e02c9bbd5d50b$var$S.port = await $382e02c9bbd5d50b$var$serialLib.requestPort({});
@@ -9244,7 +9245,6 @@ $382e02c9bbd5d50b$var$$("btn-2").addEventListener("click", async ()=>{
         $382e02c9bbd5d50b$var$openModal(`<div class="text-center text-danger mb-2">\u{65E0}\u{6CD5}\u{4ECE}\u{8FDC}\u{7A0B}\u{4ED3}\u{5E93}\u{62C9}\u{53D6}\u{7248}\u{672C}\u{4FE1}\u{606F}</div>` + `<div class="text-center text-muted small">${e.message}</div>`, "\u52A0\u8F7D\u56FA\u4EF6\u5E93\u5931\u8D25");
         return;
     }
-    const PICKER_H = "200px";
     // 型号按 chip 分组排序，让同芯片型号排在一起
     const chips = Array.from(new Set((0, $9a0a70fde08c0ab8$export$93bc8c0f38bf0855).map((m)=>m.chip)));
     const sortedModels = [
@@ -9271,13 +9271,13 @@ $382e02c9bbd5d50b$var$$("btn-2").addEventListener("click", async ()=>{
         }
     ];
     $382e02c9bbd5d50b$var$openModal(// `<div class="text-center text-muted small mb-3">先选择你的板卡型号、固件版本，再挑选烧录波特率</div>` +
-    `<div style="display:flex;gap:0;border:1px solid #eee;border-radius:8px;overflow:hidden;background:#fff;height:${PICKER_H}">` + `<div style="flex:1.2;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{578B}\u{53F7}</div>` + `<div id="c1list" style="flex:1;overflow:auto"></div>` + `</div>` + `<div style="flex:1.0;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{56FA}\u{4EF6}\u{7248}\u{672C}</div>` + `<div id="c2list" style="flex:1;overflow:auto"></div>` + `</div>` + `<div style="flex:0 0 160px;min-width:0;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{6CE2}\u{7279}\u{7387}</div>` + `<div id="c3list" style="flex:1;overflow:auto"></div>` + `</div>` + `</div>` + `<div id="pick-footer" style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#666"></div>`, "\u9009\u62E9\u578B\u53F7\u4E0E\u56FA\u4EF6", "", "picker");
+    `<div style="display:flex;gap:0;border:1px solid #eee;border-radius:8px;overflow:hidden;background:#fff;height:var(--picker-h)">` + `<div style="flex:var(--col-model-f);min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{578B}\u{53F7}</div>` + `<div id="c1list" style="flex:1;overflow:auto"></div>` + `</div>` + `<div style="flex:var(--col-version-f);min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{56FA}\u{4EF6}\u{7248}\u{672C}</div>` + `<div id="c2list" style="flex:1;overflow:auto"></div>` + `</div>` + `<div style="flex:0 0 var(--col-baud-w);min-width:0;display:flex;flex-direction:column">` + `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">\u{6CE2}\u{7279}\u{7387}</div>` + `<div id="c3list" style="flex:1;overflow:auto"></div>` + `</div>` + `</div>` + `<div id="pick-footer" style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#666"></div>`, "\u9009\u62E9\u578B\u53F7\u4E0E\u56FA\u4EF6", "", "picker");
     // 确认按钮放到 footer
     $382e02c9bbd5d50b$var$$("modal-footer").innerHTML = `<button class="btn btn-primary" id="mok" disabled>\u{786E}\u{8BA4}</button>`;
     // --- 渲染型号列 ---
     function renderC1() {
         const $c1 = $382e02c9bbd5d50b$var$$("c1list");
-        $c1.innerHTML = sortedModels.map((m, i)=>`<div class="pick-item${mOn?.id === m.id ? " on" : ""}" data-i="${i}">` + `<div class="pi-name">${m.name}</div>` + `<div class="pi-sub">${(0, $9a0a70fde08c0ab8$export$da345c9701160bab)[m.chip] || m.chip} \xb7 ${m.flashMb}MB</div>` + `</div>`).join("");
+        $c1.innerHTML = sortedModels.map((m, i)=>`<div class="pick-item${mOn?.id === m.id ? " on" : ""}" data-i="${i}">` + `<div class="pi-name">${m.name}</div>` + `</div>`).join("");
         $c1.querySelectorAll(".pick-item").forEach((el)=>{
             el.addEventListener("click", ()=>{
                 mOn = sortedModels[+el.dataset.i];
@@ -9312,17 +9312,25 @@ $382e02c9bbd5d50b$var$$("btn-2").addEventListener("click", async ()=>{
             rows.push(groupTitle("\u7A33\u5B9A\u7248", stable.length));
             stable.forEach((v, i)=>{
                 const isLatest = i === 0;
-                rows.push(`<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` + `<div style="display:flex;align-items:center;gap:8px">` + `<span style="font-weight:600">${v.version}</span>` + `<span style="font-size:11px;color:#999">${(0, $c8d0cda675c311ab$export$8c2a835c67f10f62)(v.size)}</span>` + (isLatest ? `<span style="margin-left:auto;font-size:10px;color:#fff;background:var(--brand);padding:1px 6px;border-radius:3px">\u{6700}\u{65B0}</span>` : "") + `</div>` + `</div>`);
+                rows.push(`<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` + `<div style="display:flex;align-items:center;gap:8px">` + `<span style="font-weight:600">${v.version}</span>` + `<span style="font-size:11px;color:#999">${(0, $c8d0cda675c311ab$export$8c2a835c67f10f62)(v.size)}</span>` + (isLatest ? `<span style="font-size:10px;color:var(--bs-primary-dark);background:var(--brand-soft);padding:1px 6px;border-radius:3px">\u{6700}\u{65B0}</span>` : "") + `</div>` + `</div>`);
                 idx++;
             });
         }
-        if (beta.length) {
-            rows.push(groupTitle("\u9884\u53D1\u5E03 Beta", beta.length));
-            beta.forEach((v)=>{
-                rows.push(`<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` + `<div style="display:flex;align-items:center;gap:8px">` + `<span style="font-weight:600">${v.version}</span>` + `<span style="font-size:11px;color:#999">${(0, $c8d0cda675c311ab$export$8c2a835c67f10f62)(v.size)}</span>` + `<span style="margin-left:auto;font-size:10px;color:#fff;background:#f08a24;padding:1px 6px;border-radius:3px">Beta</span>` + `</div>` + `</div>`);
-                idx++;
-            });
-        }
+        // if (beta.length) {
+        //   rows.push(groupTitle("预发布 Beta", beta.length));
+        //   beta.forEach((v) => {
+        //     rows.push(
+        //       `<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` +
+        //         `<div style="display:flex;align-items:center;gap:8px">` +
+        //           `<span style="font-weight:600">${v.version}</span>` +
+        //           `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
+        //           `<span style="font-size:10px;color:#fff;background:#f08a24;padding:1px 6px;border-radius:3px">Beta</span>` +
+        //         `</div>` +
+        //       `</div>`
+        //     );
+        //     idx++;
+        //   });
+        // }
         $c2.innerHTML = rows.join("");
         const flat = [
             ...stable,
@@ -9362,7 +9370,8 @@ $382e02c9bbd5d50b$var$$("btn-2").addEventListener("click", async ()=>{
             return;
         }
         const fwName = `${mOn.bin}_${pOn.version}.bin`;
-        $ft.innerHTML = `<span style="color:#333;font-weight:600">${mOn.name}</span>` + `<span style="color:#888">\u{2192}</span>` + `<span style="color:var(--brand);font-weight:600">${pOn.version}</span>` + `<span style="color:#888">\xb7</span>` + `<span style="color:#f08a24;font-weight:600">\u{6CE2}\u{7279}\u{7387} ${bOn}</span>` + `<span style="color:#aaa;font-family:Consolas,monospace;margin-left:auto">${fwName} \xb7 ${(0, $c8d0cda675c311ab$export$8c2a835c67f10f62)(pOn.size)}</span>`;
+        $ft.innerHTML = `<span style="color:#333;font-weight:600">${mOn.name}</span>` + `<span style="color:#888">\u{2192}</span>` + `<span style="color:var(--bs-primary);font-weight:600">${pOn.version}</span>` + `<span style="color:#888">\xb7</span>` + `<span style="color:#f08a24;font-weight:600">\u{6CE2}\u{7279}\u{7387} ${bOn}</span>`;
+        // `<span style="color:#aaa;font-family:Consolas,monospace;margin-left:auto">${fwName} · ${fmtSize(pOn.size)}</span>`;
         $ok.disabled = false;
     }
     renderC1();
@@ -9442,25 +9451,27 @@ async function $382e02c9bbd5d50b$var$startFlashing() {
     $382e02c9bbd5d50b$var$logInfo(`\u{76EE}\u{6807}\u{FF1A}${m.name} \u{2192} ${p.version}`);
     $382e02c9bbd5d50b$var$logInfo(`\u{82AF}\u{7247}\u{FF1A}${m.chip} \xb7 Flash ${m.flashMb}MB \xb7 \u{56FA}\u{4EF6}\u{5305}\u{FF1A}${m.bin}`);
     $382e02c9bbd5d50b$var$S.t0 = Date.now();
-    $382e02c9bbd5d50b$var$_flashStartMs = 0;
-    $382e02c9bbd5d50b$var$_etaShown = 60;
-    // timer 延迟到烧录开始再启动（下载阶段不算 ETA）
-    // S.timer 在下面"固件下载完成后"启动
+    $382e02c9bbd5d50b$var$_phase2StartMs = 0;
+    $382e02c9bbd5d50b$var$_phase2EtaShown = 60;
+    $382e02c9bbd5d50b$var$S.timer = window.setInterval($382e02c9bbd5d50b$var$tickEta, 1000);
     try {
-        // ---- 1) 双源竞速拉固件（进度条不动，标题纯文字）----
-        $382e02c9bbd5d50b$var$setPhase("\u56FA\u4EF6\u4E0B\u8F7D\u4E2D\u2026");
-        $382e02c9bbd5d50b$var$setProgress(0);
-        const buf = await (0, $c8d0cda675c311ab$export$ffc60442b66d084c)(p); // 不传回调，进度条不动
+        // ---- 1) 双源竞速拉固件 ----
+        $382e02c9bbd5d50b$var$setPhase("\u6B63\u5728\u4E0B\u8F7D\u56FA\u4EF6\u2026");
+        let last = 0;
+        const buf = await (0, $c8d0cda675c311ab$export$ffc60442b66d084c)(p, (loaded, total)=>{
+            if (total) {
+                const pct = Math.round(loaded / total * 100);
+                if (pct !== last) {
+                    last = pct;
+                    $382e02c9bbd5d50b$var$setProgress(Math.floor(pct / 2)); // 下载占前半段进度
+                }
+            }
+        });
         const data = new Uint8Array(buf);
         $382e02c9bbd5d50b$var$logOk(`\u{56FA}\u{4EF6}\u{4E0B}\u{8F7D}\u{5B8C}\u{6210}\u{FF0C}${(0, $c8d0cda675c311ab$export$8c2a835c67f10f62)(data.length)} \xb7 \u{6765}\u{6E90}\u{7ADE}\u{901F}\u{FF08}GitHub vs Gitee\u{FF09}`);
-        // ---- 2) esptool-js 烧录（进度条 0-100%，带 ETA）----
-        // 下载完成 → 启动 ETA 计时器
-        $382e02c9bbd5d50b$var$S.t0 = Date.now();
-        $382e02c9bbd5d50b$var$_flashStartMs = 0;
-        $382e02c9bbd5d50b$var$_etaShown = 60;
-        $382e02c9bbd5d50b$var$S.timer = window.setInterval($382e02c9bbd5d50b$var$tickEta, 1000);
+        // ---- 2) esptool-js 烧录 ----
         const offset = p.factory ? 0 : 0x10000;
-        $382e02c9bbd5d50b$var$setProgress(0); // 烧录进度从 0 开始
+        $382e02c9bbd5d50b$var$setPhase("\u6B63\u5728\u64E6\u9664\u5E76\u5199\u5165\u2026");
         const flashOptions = {
             fileArray: [
                 {
@@ -9475,7 +9486,8 @@ async function $382e02c9bbd5d50b$var$startFlashing() {
             compress: true,
             reportProgress: (_fileIndex, written, total)=>{
                 const pct = Math.round(written / total * 100);
-                $382e02c9bbd5d50b$var$setProgress(pct); // 直接 0-100%
+                $382e02c9bbd5d50b$var$setProgress(50 + Math.floor(pct / 2)); // 烧录占后半段
+            // 不再 setPhase，让 tickEta 每秒统一更新倒计时
             },
             calculateMD5Hash: (image)=>{
                 const latin1 = Array.from(image, (b)=>String.fromCharCode(b)).join("");
@@ -9500,39 +9512,47 @@ function $382e02c9bbd5d50b$var$setProgress(p) {
     bar.style.width = pct + "%";
     bar.setAttribute("aria-valuenow", String(Math.round(pct)));
 }
-// ETA 算法：烧录阶段（progress > 0）才显示倒计时
-// 下载阶段 progress = 0：由 startFlashing 自己 setPhase("固件下载中…")，这里不覆盖
-// 烧录阶段 progress 0-100%：tickEta 每秒统一更新倒计时
-let $382e02c9bbd5d50b$var$_flashStartMs = 0; // 烧录开始时间戳
-let $382e02c9bbd5d50b$var$_etaShown = 60; // 当前显示的 ETA（秒），初始值 60s
+// ETA 算法：写入阶段独立计时 + 单调递减
+// 阶段 1 下载（0-50%）：只显示"正在下载固件…"，不算 ETA
+// 阶段 2 写入（50-100%）：进入时重置计时器，从 00:60 开始逐步减小，绝不跳增
+let $382e02c9bbd5d50b$var$_phase2StartMs = 0; // 写入阶段开始时间戳（progress 到 50% 时重置）
+let $382e02c9bbd5d50b$var$_phase2EtaShown = 60; // 当前显示的 ETA（秒），初始值 60s
 function $382e02c9bbd5d50b$var$tickEta() {
     const bar = $382e02c9bbd5d50b$var$$("p-fill");
     const w = parseFloat(bar.style.width) || 0;
-    // 下载阶段（progress 还没动），不覆盖 setPhase
-    if (w <= 1) return;
-    // 快烧完了（≥95%），ETA 直接归零，不再显示 00:01 卡住
+    // 阶段 1：下载（progress <= 50），不显示 ETA
+    if (w <= 50) {
+        $382e02c9bbd5d50b$var$_phase2StartMs = 0;
+        $382e02c9bbd5d50b$var$setPhase("\u6B63\u5728\u4E0B\u8F7D\u56FA\u4EF6\u2026");
+        return;
+    }
+    // 阶段 2 首次进入（progress 刚过 50%），重置计时器
+    if ($382e02c9bbd5d50b$var$_phase2StartMs === 0) {
+        $382e02c9bbd5d50b$var$_phase2StartMs = Date.now();
+        $382e02c9bbd5d50b$var$_phase2EtaShown = 60; // 初始值 60s，后面会根据实际速率调整
+        return;
+    }
+    // 烧录到 95% 时，ETA 强制归零，显示即将完成
     if (w >= 95) {
+        $382e02c9bbd5d50b$var$_phase2EtaShown = 0;
         $382e02c9bbd5d50b$var$setPhase("\u6B63\u5728\u5199\u5165\u56FA\u4EF6\uFF0C\u5373\u5C06\u5B8C\u6210\u2026");
         return;
     }
-    if ($382e02c9bbd5d50b$var$_flashStartMs === 0) {
-        $382e02c9bbd5d50b$var$_flashStartMs = Date.now();
-        $382e02c9bbd5d50b$var$_etaShown = 60;
-        return;
-    }
-    const phaseSec = (Date.now() - $382e02c9bbd5d50b$var$_flashStartMs) / 1000;
+    // 进入写入阶段后等待 1 秒再开始估算（让速率稳定）
+    const phaseSec = (Date.now() - $382e02c9bbd5d50b$var$_phase2StartMs) / 1000;
     if (phaseSec < 1) return;
-    // 整体平均速率
-    const avgRate = w / phaseSec;
+    // 写入阶段的进度：0-50（50% 起点，100% 终点）
+    const writeProgress = w - 50; // 0 ~ 50
+    const avgRate = writeProgress / phaseSec; // % / 秒
     if (avgRate > 0.5) {
         const eta = Math.max(1, (100 - w) / avgRate);
-        // 单调递减
-        if (eta < $382e02c9bbd5d50b$var$_etaShown) $382e02c9bbd5d50b$var$_etaShown = eta;
+        // 单调递减：如果新 ETA 更小，更新；如果更大，保持不变
+        if (eta < $382e02c9bbd5d50b$var$_phase2EtaShown) $382e02c9bbd5d50b$var$_phase2EtaShown = eta;
     }
-    // 软递减
-    $382e02c9bbd5d50b$var$_etaShown = Math.max(1, $382e02c9bbd5d50b$var$_etaShown - 0.5);
-    const mm = String(Math.floor($382e02c9bbd5d50b$var$_etaShown / 60)).padStart(2, "0");
-    const ss = String(Math.floor($382e02c9bbd5d50b$var$_etaShown % 60)).padStart(2, "0");
+    // 每秒软递减（显示更自然）
+    $382e02c9bbd5d50b$var$_phase2EtaShown = Math.max(1, $382e02c9bbd5d50b$var$_phase2EtaShown - 0.5);
+    const mm = String(Math.floor($382e02c9bbd5d50b$var$_phase2EtaShown / 60)).padStart(2, "0");
+    const ss = String(Math.floor($382e02c9bbd5d50b$var$_phase2EtaShown % 60)).padStart(2, "0");
     $382e02c9bbd5d50b$var$setPhase(`\u{6B63}\u{5728}\u{5199}\u{5165}\u{56FA}\u{4EF6}\u{FF0C}\u{9884}\u{8BA1}\u{5269}\u{4F59} ${mm}:${ss}`);
 }
 function $382e02c9bbd5d50b$var$finishOk() {
@@ -9694,7 +9714,7 @@ async function $382e02c9bbd5d50b$var$openFirmwareDownloadModal() {
     }
     let mOn = null; // 选中的型号
     let vOn = null; // 选中的版本（stable）
-    $382e02c9bbd5d50b$var$openModal(`<div class="picker3" style="height:340px">` + `<div class="col c1"><div class="hd">\u{578B}\u{53F7}</div><div id="fwMlist"></div></div>` + `<div class="col c2"><div class="hd">\u{7248}\u{672C}\u{53F7}\u{FF08}\u{7A33}\u{5B9A}\u{7248}\u{FF09}</div><div id="fwVlist"></div></div>` + `</div>` + `<div id="fwHint" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:right">\u{8BF7}\u{9009}\u{62E9}\u{578B}\u{53F7}\u{548C}\u{7248}\u{672C}</div>`, "\u9009\u62E9\u56FA\u4EF6", `<button class="btn btn-primary btn-sm" id="fwdl" disabled>\u{4E0B}\u{8F7D}</button>`);
+    $382e02c9bbd5d50b$var$openModal(`<div class="picker3" style="height:var(--picker-firmware-h)">` + `<div class="col c1"><div class="hd">\u{578B}\u{53F7}</div><div id="fwMlist"></div></div>` + `<div class="col c2"><div class="hd">\u{7248}\u{672C}\u{53F7}\u{FF08}\u{7A33}\u{5B9A}\u{7248}\u{FF09}</div><div id="fwVlist"></div></div>` + `</div>` + `<div id="fwHint" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:right">\u{8BF7}\u{9009}\u{62E9}\u{578B}\u{53F7}\u{548C}\u{7248}\u{672C}</div>`, "\u9009\u62E9\u56FA\u4EF6", `<button class="btn btn-primary btn-sm" id="fwdl" disabled>\u{4E0B}\u{8F7D}</button>`, "firmware");
     // footer 清空（下载按钮已移到标题栏右侧）
     $382e02c9bbd5d50b$var$$("modal-footer").innerHTML = "";
     // --- 渲染型号列 ---
@@ -9798,4 +9818,4 @@ $382e02c9bbd5d50b$var$setFoot("\u63D0\u793A\uFF1A\u672C\u9875\u9700\u4F7F\u7528\
 $382e02c9bbd5d50b$var$logInfo("\uD83D\uDE80 WLED Web Flash \u5DF2\u52A0\u8F7D \u2014 esptool-js + \u4E09\u6B65\u5411\u5BFC");
 
 
-//# sourceMappingURL=typescript.ede591c7.js.map
+//# sourceMappingURL=typescript.683b16af.js.map

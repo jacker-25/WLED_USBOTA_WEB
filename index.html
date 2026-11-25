@@ -66,16 +66,33 @@
   display: flex !important;
 }
 
+:root {
+  --w-confirm: 460px;
+  --w-picker: 500px;
+  --w-firmware: 480px;
+  --w-lg: 800px;
+  --m-top-vh: 45vh;
+  --picker-h: 180px;
+  --col-model-f: 1;
+  --col-version-f: 1;
+  --col-baud-w: 120px;
+  --picker-firmware-h: 180px;
+}
+
 #mainModal .modal-dialog-centered {
-  min-height: 55vh !important;
+  min-height: var(--m-top-vh) !important;
 }
 
 #mainModal .modal-dialog.modal-confirm {
-  max-width: 460px !important;
+  max-width: var(--w-confirm) !important;
 }
 
 #mainModal .modal-dialog.modal-picker {
-  max-width: 520px !important;
+  max-width: var(--w-picker) !important;
+}
+
+#mainModal .modal-dialog.modal-firmware {
+  max-width: var(--w-firmware) !important;
 }
 
 .pick-item .pi-name, .pick-item .pi-sub {
@@ -697,11 +714,10 @@ body {
   font-size: 11px;
 }
 
-.picker3 .c3 .it .tag {
-  color: #fff;
-  background: var(--bs-primary);
+.picker3 .it .tag {
+  color: var(--bs-primary-dark);
+  background: var(--brand-soft);
   border-radius: 3px;
-  margin-left: auto;
   padding: 1px 6px;
   font-size: 10px;
 }
@@ -902,7 +918,7 @@ body {
 
 <!-- Bootstrap 5.3 JS Bundle（含 Modal、Progress 等组件逻辑） -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="typescript.ede591c7.js" type="module"></script>
+<script src="typescript.683b16af.js" type="module"></script>
 
 
 </body></html>
