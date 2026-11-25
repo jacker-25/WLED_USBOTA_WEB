@@ -184,9 +184,9 @@ function getModal() {
  * @param bodyHTML    要放进 modal-body 的 HTML
  * @param title       顶部标题（可选）
  * @param headerRight 标题右侧、× 左边的自定义 HTML（可选，比如下载按钮）
- * @param size        弹窗尺寸：'sm' | '' (默认 md) | 'lg' | 'xl' | 'picker' (自定义 680px)
+ * @param size        弹窗尺寸：'sm' | '' (默认 md) | 'lg' | 'xl' | 'picker' (三列选择器) | 'firmware' (固件下载)
  */
-function openModal(bodyHTML: string, title = "", headerRight = "", size: "sm" | "" | "lg" | "xl" | "picker" = "lg") {
+function openModal(bodyHTML: string, title = "", headerRight = "", size: "sm" | "" | "lg" | "xl" | "picker" | "firmware" = "lg") {
   // 清理 footer + header 右侧残留
   $("modal-footer").innerHTML = "";
   const dialog = document.getElementById("modal-dialog")!;
@@ -195,9 +195,11 @@ function openModal(bodyHTML: string, title = "", headerRight = "", size: "sm" | 
   if (oldRight) oldRight.remove();
 
   // 动态切换尺寸 class
-  dialog.classList.remove("modal-sm", "modal-lg", "modal-xl", "modal-dialog-scrollable", "modal-confirm", "modal-picker");
+  dialog.classList.remove("modal-sm", "modal-lg", "modal-xl", "modal-dialog-scrollable", "modal-confirm", "modal-picker", "modal-firmware");
   if (size === "picker") {
     dialog.classList.add("modal-lg", "modal-picker");   // 用 lg 作为基础，CSS 覆盖 max-width
+  } else if (size === "firmware") {
+    dialog.classList.add("modal-lg", "modal-firmware");
   } else if (size) {
     dialog.classList.add("modal-" + size);
   }
@@ -333,7 +335,7 @@ $("btn-1").addEventListener("click", async () => {
   }
 
   try {
-    // setFoot("正在请求串口权限…");
+    setFoot("正在请求串口权限…");
     if (CONFIG.LOG_WINDOW) logBox.classList.add("show");
 
     // requestPort 必须留在 click 同步栈里
@@ -477,8 +479,6 @@ $("btn-2").addEventListener("click", async () => {
     }
   }
 
-  const PICKER_H = "200px";
-
   // 型号按 chip 分组排序，让同芯片型号排在一起
   const chips = Array.from(new Set(WLED_MODELS.map((m) => m.chip)));
   const sortedModels = [...WLED_MODELS].sort(
@@ -497,16 +497,16 @@ $("btn-2").addEventListener("click", async () => {
 
   openModal(
     // `<div class="text-center text-muted small mb-3">先选择你的板卡型号、固件版本，再挑选烧录波特率</div>` +
-    `<div style="display:flex;gap:0;border:1px solid #eee;border-radius:8px;overflow:hidden;background:#fff;height:${PICKER_H}">` +
-      `<div style="flex:1.2;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
+    `<div style="display:flex;gap:0;border:1px solid #eee;border-radius:8px;overflow:hidden;background:#fff;height:var(--picker-h)">` +
+      `<div style="flex:var(--col-model-f);min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">型号</div>` +
         `<div id="c1list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
-      `<div style="flex:1.0;min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
+      `<div style="flex:var(--col-version-f);min-width:0;border-right:1px solid #eee;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">固件版本</div>` +
         `<div id="c2list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
-      `<div style="flex:0 0 160px;min-width:0;display:flex;flex-direction:column">` +
+      `<div style="flex:0 0 var(--col-baud-w);min-width:0;display:flex;flex-direction:column">` +
         `<div style="font-size:11px;letter-spacing:1px;color:#aaa;text-align:center;padding:9px 0;border-bottom:1px solid #eee;background:#fcfcfc">波特率</div>` +
         `<div id="c3list" style="flex:1;overflow:auto"></div>` +
       `</div>` +
@@ -528,7 +528,6 @@ $("btn-2").addEventListener("click", async () => {
         (m, i) =>
           `<div class="pick-item${mOn?.id === m.id ? " on" : ""}" data-i="${i}">` +
             `<div class="pi-name">${m.name}</div>` +
-            `<div class="pi-sub">${CHIP_LABEL[m.chip] || m.chip} · ${m.flashMb}MB</div>` +
           `</div>`
       )
       .join("");
@@ -573,28 +572,28 @@ $("btn-2").addEventListener("click", async () => {
             `<div style="display:flex;align-items:center;gap:8px">` +
               `<span style="font-weight:600">${v.version}</span>` +
               `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
-              (isLatest ? `<span style="margin-left:auto;font-size:10px;color:#fff;background:var(--brand);padding:1px 6px;border-radius:3px">最新</span>` : "") +
+              (isLatest ? `<span style="font-size:10px;color:var(--bs-primary-dark);background:var(--brand-soft);padding:1px 6px;border-radius:3px">最新</span>` : "") +
             `</div>` +
           `</div>`
         );
         idx++;
       });
     }
-    if (beta.length) {
-      rows.push(groupTitle("预发布 Beta", beta.length));
-      beta.forEach((v) => {
-        rows.push(
-          `<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` +
-            `<div style="display:flex;align-items:center;gap:8px">` +
-              `<span style="font-weight:600">${v.version}</span>` +
-              `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
-              `<span style="margin-left:auto;font-size:10px;color:#fff;background:#f08a24;padding:1px 6px;border-radius:3px">Beta</span>` +
-            `</div>` +
-          `</div>`
-        );
-        idx++;
-      });
-    }
+    // if (beta.length) {
+    //   rows.push(groupTitle("预发布 Beta", beta.length));
+    //   beta.forEach((v) => {
+    //     rows.push(
+    //       `<div class="pick-item${pOn?.version === v.version && pOn?.channel === v.channel ? " on" : ""}" data-idx="${idx}" style="padding:10px 12px;border-bottom:1px solid #f4f4f4;cursor:pointer;transition:.15s;background:#fff" onmouseover="this.style.background='#fafafa'" onmouseout="this.style.background=''">` +
+    //         `<div style="display:flex;align-items:center;gap:8px">` +
+    //           `<span style="font-weight:600">${v.version}</span>` +
+    //           `<span style="font-size:11px;color:#999">${fmtSize(v.size)}</span>` +
+    //           `<span style="font-size:10px;color:#fff;background:#f08a24;padding:1px 6px;border-radius:3px">Beta</span>` +
+    //         `</div>` +
+    //       `</div>`
+    //     );
+    //     idx++;
+    //   });
+    // }
 
     $c2.innerHTML = rows.join("");
     const flat = [...stable, ...beta];
@@ -642,10 +641,10 @@ $("btn-2").addEventListener("click", async () => {
     $ft.innerHTML =
       `<span style="color:#333;font-weight:600">${mOn.name}</span>` +
       `<span style="color:#888">→</span>` +
-      `<span style="color:var(--brand);font-weight:600">${pOn.version}</span>` +
+      `<span style="color:var(--bs-primary);font-weight:600">${pOn.version}</span>` +
       `<span style="color:#888">·</span>` +
-      `<span style="color:#f08a24;font-weight:600">波特率 ${bOn}</span>` +
-      `<span style="color:#aaa;font-family:Consolas,monospace;margin-left:auto">${fwName} · ${fmtSize(pOn.size)}</span>`;
+      `<span style="color:#f08a24;font-weight:600">波特率 ${bOn}</span>` ;
+      // `<span style="color:#aaa;font-family:Consolas,monospace;margin-left:auto">${fwName} · ${fmtSize(pOn.size)}</span>`;
     $ok.disabled = false;
   }
 
@@ -763,37 +762,40 @@ async function startFlashing() {
   logInfo(`芯片：${m.chip} · Flash ${m.flashMb}MB · 固件包：${m.bin}`);
 
   S.t0 = Date.now();
-  _flashStartMs = 0; _etaShown = 60;
-  // timer 延迟到烧录开始再启动（下载阶段不算 ETA）
-  // S.timer 在下面"固件下载完成后"启动
+  _phase2StartMs = 0; _phase2EtaShown = 60;
+  S.timer = window.setInterval(tickEta, 1000);
 
   try {
-    // ---- 1) 双源竞速拉固件（进度条不动，标题纯文字）----
-    setPhase("固件下载中…");
-    setProgress(0);
-    const buf = await raceFetchFirmware(p);   // 不传回调，进度条不动
+    // ---- 1) 双源竞速拉固件 ----
+    setPhase("正在下载固件…");
+    let last = 0;
+    const buf = await raceFetchFirmware(p, (loaded, total) => {
+      if (total) {
+        const pct = Math.round((loaded / total) * 100);
+        if (pct !== last) {
+          last = pct;
+          setProgress(Math.floor(pct / 2));  // 下载占前半段进度
+        }
+      }
+    });
     const data = new Uint8Array(buf);
     logOk(`固件下载完成，${fmtSize(data.length)} · 来源竞速（GitHub vs Gitee）`);
 
-    // ---- 2) esptool-js 烧录（进度条 0-100%，带 ETA）----
-    // 下载完成 → 启动 ETA 计时器
-    S.t0 = Date.now();
-    _flashStartMs = 0; _etaShown = 60;
-    S.timer = window.setInterval(tickEta, 1000);
-
+    // ---- 2) esptool-js 烧录 ----
     const offset = p.factory ? 0 : 0x10000;
-    setProgress(0);   // 烧录进度从 0 开始
+    setPhase("正在擦除并写入…");
 
     const flashOptions: FlashOptions = {
       fileArray: [{ data, address: offset }],
       flashMode: "keep",
       flashFreq: "keep",
       flashSize: "keep",
-      eraseAll: false,
+      eraseAll: false,         // 保留 NVS 参数（WiFi 配置、绑定 token 等），仅擦写固件覆盖扇区
       compress: true,
       reportProgress: (_fileIndex, written, total) => {
         const pct = Math.round((written / total) * 100);
-        setProgress(pct);  // 直接 0-100%
+        setProgress(50 + Math.floor(pct / 2));  // 烧录占后半段
+        // 不再 setPhase，让 tickEta 每秒统一更新倒计时
       },
       calculateMD5Hash: (image: Uint8Array) => {
         const latin1 = Array.from(image, (b) => String.fromCharCode(b)).join("");
@@ -819,47 +821,59 @@ function setProgress(p: number) {
   bar.style.width = pct + "%";
   bar.setAttribute("aria-valuenow", String(Math.round(pct)));
 }
-// ETA 算法：烧录阶段（progress > 0）才显示倒计时
-// 下载阶段 progress = 0：由 startFlashing 自己 setPhase("固件下载中…")，这里不覆盖
-// 烧录阶段 progress 0-100%：tickEta 每秒统一更新倒计时
-let _flashStartMs = 0;   // 烧录开始时间戳
-let _etaShown = 60;     // 当前显示的 ETA（秒），初始值 60s
+// ETA 算法：写入阶段独立计时 + 单调递减
+// 阶段 1 下载（0-50%）：只显示"正在下载固件…"，不算 ETA
+// 阶段 2 写入（50-100%）：进入时重置计时器，从 00:60 开始逐步减小，绝不跳增
+let _phase2StartMs = 0;    // 写入阶段开始时间戳（progress 到 50% 时重置）
+let _phase2EtaShown = 60;  // 当前显示的 ETA（秒），初始值 60s
 
 function tickEta() {
   const bar = $("p-fill") as HTMLElement;
   const w = parseFloat(bar.style.width) || 0;
 
-  // 下载阶段（progress 还没动），不覆盖 setPhase
-  if (w <= 1) return;
+  // 阶段 1：下载（progress <= 50），不显示 ETA
+  if (w <= 50) {
+    _phase2StartMs = 0;
+    setPhase("正在下载固件…");
+    return;
+  }
 
-  // 快烧完了（≥95%），ETA 直接归零，不再显示 00:01 卡住
+  // 阶段 2 首次进入（progress 刚过 50%），重置计时器
+  if (_phase2StartMs === 0) {
+    _phase2StartMs = Date.now();
+    _phase2EtaShown = 60;   // 初始值 60s，后面会根据实际速率调整
+    return;
+  }
+
+  // 烧录到 95% 时，ETA 强制归零，显示即将完成
   if (w >= 95) {
+    _phase2EtaShown = 0;
     setPhase("正在写入固件，即将完成…");
     return;
   }
 
-  if (_flashStartMs === 0) {
-    _flashStartMs = Date.now();
-    _etaShown = 60;
-    return;
-  }
-
-  const phaseSec = (Date.now() - _flashStartMs) / 1000;
+  // 进入写入阶段后等待 1 秒再开始估算（让速率稳定）
+  const phaseSec = (Date.now() - _phase2StartMs) / 1000;
   if (phaseSec < 1) return;
 
-  // 整体平均速率
-  const avgRate = w / phaseSec;
-  if (avgRate > 0.5) {
+  // 写入阶段的进度：0-50（50% 起点，100% 终点）
+  const writeProgress = w - 50;   // 0 ~ 50
+  const avgRate = writeProgress / phaseSec;   // % / 秒
+
+  if (avgRate > 0.5) {   // 速率太低不估算（防止刚进入时抖动）
     const eta = Math.max(1, (100 - w) / avgRate);
-    // 单调递减
-    if (eta < _etaShown) _etaShown = eta;
+
+    // 单调递减：如果新 ETA 更小，更新；如果更大，保持不变
+    if (eta < _phase2EtaShown) {
+      _phase2EtaShown = eta;
+    }
   }
 
-  // 软递减
-  _etaShown = Math.max(1, _etaShown - 0.5);
+  // 每秒软递减（显示更自然）
+  _phase2EtaShown = Math.max(1, _phase2EtaShown - 0.5);
 
-  const mm = String(Math.floor(_etaShown / 60)).padStart(2, "0");
-  const ss = String(Math.floor(_etaShown % 60)).padStart(2, "0");
+  const mm = String(Math.floor(_phase2EtaShown / 60)).padStart(2, "0");
+  const ss = String(Math.floor(_phase2EtaShown % 60)).padStart(2, "0");
   setPhase(`正在写入固件，预计剩余 ${mm}:${ss}`);
 }
 
@@ -1072,13 +1086,14 @@ async function openFirmwareDownloadModal() {
   let vOn: RemoteBinVersion | null = null;                // 选中的版本（stable）
 
   openModal(
-    `<div class="picker3" style="height:340px">` +
+    `<div class="picker3" style="height:var(--picker-firmware-h)">` +
       `<div class="col c1"><div class="hd">型号</div><div id="fwMlist"></div></div>` +
       `<div class="col c2"><div class="hd">版本号（稳定版）</div><div id="fwVlist"></div></div>` +
     `</div>` +
     `<div id="fwHint" style="margin-top:10px;font-size:12px;color:#888;min-height:16px;text-align:right">请选择型号和版本</div>`,
     "选择固件",
-    `<button class="btn btn-primary btn-sm" id="fwdl" disabled>下载</button>`
+    `<button class="btn btn-primary btn-sm" id="fwdl" disabled>下载</button>`,
+    "firmware"
   );
   // footer 清空（下载按钮已移到标题栏右侧）
   $("modal-footer").innerHTML = "";

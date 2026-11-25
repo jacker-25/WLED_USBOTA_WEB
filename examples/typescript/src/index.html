@@ -68,18 +68,60 @@
   white-space:nowrap !important;
 }
 
-/* ========= Modal 垂直位置：对齐有效内容区域（上半部分居中） ========= */
-/* Bootstrap 默认 min-height:100vh 让弹窗在整个视口正中，改成 55vh 让弹窗偏上 */
+/* ============================================================
+   Modal & Picker 尺寸配置（集中管理，改 :root 里的变量就行）
+
+   弹窗宽度
+   --w-confirm         确认/警告弹窗宽度
+   --w-picker          三列选择器弹窗宽度
+   --w-lg              通用 lg 弹窗宽度（固件下载/错误/日志）
+   --m-top-vh          弹窗垂直偏上位置
+
+   三列选择器高度 & 列宽（选型号+固件版本+波特率）
+   --picker-h          整体高度
+   --col-model-f       型号列 flex 比例
+   --col-version-f     固件版本列 flex 比例
+   --col-baud-w        波特率列固定宽度
+
+   固件下载选择器
+   --picker-firmware-h 固件下载弹窗高度
+   ============================================================ */
+:root{
+  /* —— 弹窗宽度（每个独立，互不影响） —— */
+  --w-confirm:          460px;    /* 确认/警告弹窗 */
+  --w-picker:           500px;   /* 三列选择器弹窗（选型号+固件+波特率） */
+  --w-firmware:         480px;   /* 固件下载弹窗（选型号+版本号） */
+  --w-lg:               800px;   /* 通用 lg 弹窗（错误/日志等） */
+  --m-top-vh:           45vh;    /* 弹窗垂直偏上 */
+
+  /* —— 三列选择器（选型号+固件+波特率） —— */
+  --picker-h:           180px;   /* 整体高度 */
+  --col-model-f:        1.0;     /* 型号列 flex 比例 ← 改这个调宽 */
+  --col-version-f:      1.0;     /* 固件版本列 flex 比例 ← 改这个调宽 */
+  --col-baud-w:         120px;   /* 波特率列固定宽度 ← 改这个 */
+
+  /* —— 固件下载弹窗（两列） —— */
+  --picker-firmware-h:  180px;    /* 高度 ← 改这个 */
+}
+
+/* 弹窗垂直位置 */
 #mainModal .modal-dialog-centered{
-  min-height:55vh !important;
+  min-height: var(--m-top-vh) !important;
 }
-/* 确认弹窗：中等偏小 460px */
+
+/* 确认/警告弹窗 */
 #mainModal .modal-dialog.modal-confirm{
-  max-width:460px !important;
+  max-width: var(--w-confirm) !important;
 }
-/* 三列选择器弹窗：580px（比 modal-lg 800px 窄，够放三列又不浪费） */
+
+/* 三列选择器弹窗（型号+固件版本+波特率） */
 #mainModal .modal-dialog.modal-picker{
-  max-width:520px !important;
+  max-width: var(--w-picker) !important;
+}
+
+/* 固件下载弹窗（选型号+版本号） */
+#mainModal .modal-dialog.modal-firmware{
+  max-width: var(--w-firmware) !important;
 }
 
 /* pick-item：型号名/副标题单行不换行 */
@@ -284,8 +326,8 @@ body{
 .picker3 .c3 .it .rowv{display:flex;align-items:center;gap:8px;width:100%}
 .picker3 .c3 .it .v{font-weight:600}
 .picker3 .c3 .it .d{font-size:11px;color:var(--sub)}
-.picker3 .c3 .it .tag{
-  margin-left:auto;font-size:10px;color:#fff;background:var(--bs-primary);padding:1px 6px;border-radius:3px;
+.picker3 .it .tag{
+  font-size:10px;color:var(--bs-primary-dark);background:var(--brand-soft);padding:1px 6px;border-radius:3px;
 }
 .picker3 .c3 .it.on{background:var(--brand-soft)}
 .picker3 .c3 .it:hover{background:#fdf3e7}
